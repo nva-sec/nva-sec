@@ -2,6 +2,11 @@ name: ECG Identifiability Audit
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - analysis/ecg_identifiability_audit.py.gz.b64
+      - analysis/ecg_pr_trigger.txt
+      - .github/workflows/ecg_identifiability.yml
   push:
     paths:
       - analysis/ecg_identifiability_audit.py.gz.b64
@@ -11,7 +16,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: ecg-identifiability-audit
+  group: ecg-identifiability-audit-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -98,21 +103,6 @@ jobs:
         shell: bash
         run: |
           (cd results && find . -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt)
-
-      - name: Publish machine-readable temporary results
-        if: always()
-        shell: bash
-        run: |
-          rm -rf TEMP_ECG_RESULTS
-          mkdir -p TEMP_ECG_RESULTS
-          for f in results/*.json results/*.csv results/*.md results/*.txt; do
-            [ -e "$f" ] && cp "$f" TEMP_ECG_RESULTS/
-          done
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -f TEMP_ECG_RESULTS
-          git commit -m 'Publish temporary ECG audit results' || true
-          git push origin HEAD:main
 
       - name: Upload auditable result bundle
         if: always()
