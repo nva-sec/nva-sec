@@ -1,1 +1,2 @@
 Execute the preregistered ECG identifiability audit against the public SJLIFE paired waveform repository.
+Run attempt: 2 (dependency manifest added; hypotheses and analysis code unchanged).
