@@ -423,7 +423,7 @@ def make_report(
         f"- Qualifying candidates: {discovery['discovery']['qualifying_count']}.",
         "- Artifact-sourced qualifying counts by k=1/2/3/4: "
         + "/".join(str(value) for value in qualifying_by_k)
-        + " (0/15/282/2678).",
+        + ".",
         f"- 24-window repeated-CV AUROC: {fmt(comparator['auroc'])}.",
         f"- Nested folds yielding a design: "
         f"{nested['outer_folds_with_design']}/{nested['outer_fold_count']}.",
