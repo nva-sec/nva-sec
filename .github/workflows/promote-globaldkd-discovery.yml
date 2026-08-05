@@ -1,9 +1,9 @@
 name: Promote exact frozen GlobalDKD discovery
 
 on:
-  push:
+  pull_request:
     branches:
-      - transient/globaldkd-schema-20260805
+      - main
     paths:
       - '.github/workflows/promote-globaldkd-discovery.yml'
 
@@ -19,7 +19,9 @@ jobs:
   promote-frozen-files:
     if: >-
       github.repository == 'nva-sec/nva-sec' &&
-      github.ref == 'refs/heads/transient/globaldkd-schema-20260805'
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.ref ==
+      'transient/globaldkd-schema-20260805'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
