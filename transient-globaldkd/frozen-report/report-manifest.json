@@ -1,0 +1,34 @@
+{
+  "execution": {
+    "attempt_1_job": "92317956542",
+    "attempt_1_run": "31009572812",
+    "spanish_phase": "schema-only technical retry 1",
+    "technical_retry_artifact": "8932293583",
+    "technical_retry_job": "92321693370",
+    "technical_retry_run": "31010663111"
+  },
+  "inputs": {
+    "attempt_1_failure_note_sha256": "d84eab971456f7ecc6418b1aa41b3a33f819d27a354d7daadcf78ab55c17100e",
+    "discovery_sha256": "41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f",
+    "validation_sha256": "fb1111b4e0539f854c60bbb11c6211632d3162cb5ccb1505736bed9085a33da4"
+  },
+  "outputs": {
+    "figures/analysis-timeline.svg": "b1ee432ce08e4a63faadc2a94f0d4cc0dcb4fbe22f92892084c6c8a4fbb1593f",
+    "figures/computational-window-library.svg": "d33ae2d7c6eb35558fa61bc8c50c0f67fd1f1078cfc8f13643271e139bb1539f",
+    "figures/discovery-performance.svg": "a1eb9df38fcc8bbc27f02348ccf54ecc7f69de76f857342646d82d0130c36bff",
+    "figures/exact-search-landscape.svg": "b4c7ed9fd325abea37fe99992dda1c8f40357d0dccaa09551edbe55d0fb2dab6",
+    "figures/held-out-spanish-roc.svg": "b2d77d561844d275a79328746ff12ee19096d166954faa9d2871c9f87d06bb73",
+    "figures/robustness-and-controls.svg": "3193110e8d1ba895f17b8aead28eb9b3b29374d321175f706abfed4c4d0b1cd7",
+    "figures/unlabeled-control-plausibility.svg": "c760d0bfbe1cb9d62782d47160a647c31e70085c70962c89886990a903224fb7",
+    "report.md": "47ca7901f3e0b1a1d5c77fe5f414e342dc32b83276edf11abf006aa7c696732b"
+  },
+  "schema_version": "globaldkd-report-manifest-v1",
+  "scope": "read-only rendering; no archive access, fitting, selection, threshold changes, control labels, or hardware simulation",
+  "warnings": [
+    "computational mean-absorbance windows are not physical filters",
+    "22 missing-albumin controls remain unlabeled",
+    "Spanish reuse is archived held-out reuse, not prospective validation",
+    "Spanish evaluation succeeded only on schema-only technical retry 1",
+    "high Spanish negative-control AUROC limits spectral-specific interpretation"
+  ]
+}
