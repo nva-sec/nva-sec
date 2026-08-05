@@ -31,6 +31,7 @@ from sklearn.exceptions import ConvergenceWarning
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix, roc_auc_score
 from sklearn.model_selection import RepeatedStratifiedKFold, StratifiedKFold
+from sklearn.preprocessing import StandardScaler
 
 TITLE = (
     "How Many Spectral Windows Are Enough? An Exact Sparse-Window Certificate "
@@ -322,11 +323,10 @@ def model_matrix(features: np.ndarray, indices: Sequence[int]) -> np.ndarray:
 def fit_model(matrix: np.ndarray, labels: np.ndarray) -> dict:
     if not np.all(np.isfinite(matrix)):
         raise RuntimeError("nonfinite training matrix")
-    mean = matrix.mean(axis=0)
-    variance = np.mean((matrix - mean) ** 2, axis=0)
-    scale = np.sqrt(variance)
-    scale[scale == 0.0] = 1.0
-    standardized = (matrix - mean) / scale
+    scaler = StandardScaler()
+    standardized = scaler.fit_transform(matrix)
+    mean = np.asarray(scaler.mean_, dtype=np.float64)
+    scale = np.asarray(scaler.scale_, dtype=np.float64)
     estimator = LogisticRegression(**MODEL_SPEC)
     with warnings.catch_warnings():
         warnings.simplefilter("error", ConvergenceWarning)
