@@ -8,6 +8,7 @@ on:
       - '.github/workflows/promote-globaldkd-discovery.yml'
       - '.github/workflows/globaldkd-validation-one-shot.yml'
       - '.github/workflows/promote-globaldkd-validation-retry1.yml'
+      - '.github/workflows/promote-globaldkd-report.yml'
       - '.github/workflows/globaldkd-report-frozen.yml'
       - 'transient-globaldkd/frozen-discovery/**'
       - 'transient-globaldkd/frozen-validation/**'
