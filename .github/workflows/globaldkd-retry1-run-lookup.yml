@@ -1,0 +1,32 @@
+name: Read-only lookup of GlobalDKD retry-1 run
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  lookup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query exact retry sentinel head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api \
+            '/repos/nva-sec/nva-sec/actions/runs?head_sha=eaa9611bd67b662987a307f85e5fd08a67e235d0&per_page=100' \
+            > runs.json
+          jq '{total_count, workflow_runs: [.workflow_runs[] | {id,name,event,status,conclusion,head_sha,jobs_url,artifacts_url,html_url}]}' runs.json
+          test "$(jq '.total_count' runs.json)" -ge 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: globaldkd-retry1-run-lookup
+          path: runs.json
+          if-no-files-found: warn
+          retention-days: 1
