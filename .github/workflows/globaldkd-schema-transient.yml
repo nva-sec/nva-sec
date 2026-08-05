@@ -7,7 +7,13 @@ on:
     paths-ignore:
       - '.github/workflows/promote-globaldkd-discovery.yml'
       - '.github/workflows/globaldkd-validation-one-shot.yml'
+      - '.github/workflows/promote-globaldkd-validation-retry1.yml'
+      - '.github/workflows/globaldkd-report-frozen.yml'
       - 'transient-globaldkd/frozen-discovery/**'
+      - 'transient-globaldkd/frozen-validation/**'
+      - 'transient-globaldkd/frozen-report/**'
+      - 'transient-globaldkd/generate_report.py'
+      - 'transient-globaldkd/requirements-report.txt'
       - 'transient-globaldkd/validate_spain_locked.py'
       - 'transient-globaldkd/VALIDATION_UNLOCK'
       - 'transient-globaldkd/outputs/validation/**'
