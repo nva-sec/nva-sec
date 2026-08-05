@@ -40,15 +40,29 @@ jobs:
             transient-globaldkd/data/GlobalDKD.zip \
             transient-globaldkd/outputs/schema-audit
 
+      - name: Deepen MATLAB and live-script schema without numeric values
+        if: always()
+        run: |
+          python transient-globaldkd/schema_deepener.py \
+            transient-globaldkd/data/GlobalDKD.zip \
+            transient-globaldkd/outputs/schema-audit
+
       - name: Print schema-only artifact for review
         if: always()
         run: |
-          if [ -f transient-globaldkd/outputs/schema-audit/README.md ]; then
-            cat transient-globaldkd/outputs/schema-audit/README.md
-          fi
-          if [ -f transient-globaldkd/outputs/schema-audit/schema-audit.json ]; then
-            cat transient-globaldkd/outputs/schema-audit/schema-audit.json
-          fi
+          for audit_file in \
+            README.md \
+            schema-audit.json \
+            deep-mat-schema.json \
+            DATASET.complete-code.txt \
+            mlx-symbol-context.txt
+          do
+            artifact_path="transient-globaldkd/outputs/schema-audit/${audit_file}"
+            if [ -f "${artifact_path}" ]; then
+              echo "===== ${audit_file} ====="
+              cat "${artifact_path}"
+            fi
+          done
 
       - name: Upload schema audit
         if: always()
