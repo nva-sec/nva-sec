@@ -1,0 +1,146 @@
+name: Technical retry 1 — locked GlobalDKD Spanish validation
+
+on:
+  push:
+    branches:
+      - transient/globaldkd-schema-20260805
+    paths:
+      - 'transient-globaldkd/frozen-discovery/retry-control/VALIDATION_RETRY1_UNLOCK'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: globaldkd-spanish-validation-technical-retry1
+  cancel-in-progress: false
+
+env:
+  PYTHONHASHSEED: '0'
+  OMP_NUM_THREADS: '1'
+  OPENBLAS_NUM_THREADS: '1'
+  MKL_NUM_THREADS: '1'
+  VECLIB_MAXIMUM_THREADS: '1'
+  NUMEXPR_NUM_THREADS: '1'
+
+jobs:
+  validate-spain-technical-retry1:
+    if: >-
+      github.repository == 'nva-sec/nva-sec' &&
+      github.ref == 'refs/heads/transient/globaldkd-schema-20260805'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Fail-closed retry preflight before archive access
+        run: |
+          set -euo pipefail
+          unlock='transient-globaldkd/frozen-discovery/retry-control/VALIDATION_RETRY1_UNLOCK'
+          boundary_branch='refs/heads/transient/globaldkd-validation-retry1-boundary-20260805'
+          boundary_ref='refs/remotes/origin/globaldkd-validation-retry1-boundary'
+          git fetch --no-tags origin "$boundary_branch:$boundary_ref"
+          boundary_sha="$(git rev-parse "$boundary_ref")"
+          parent_sha="$(git rev-parse "$GITHUB_SHA^")"
+          test "$parent_sha" = "$boundary_sha"
+          test -z "$(git ls-tree -r --name-only "$boundary_sha" -- "$unlock")"
+
+          expected="UNLOCK_SPANISH_TECHNICAL_RETRY1 discovery=41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f attempt1=31009572812 boundary=$boundary_sha"
+          printf '%s\n' "$expected" > "$RUNNER_TEMP/expected-unlock"
+          cmp -s "$RUNNER_TEMP/expected-unlock" "$unlock"
+
+          changed="$(git diff-tree --no-commit-id --name-status -r "$GITHUB_SHA")"
+          expected_change="$(printf 'A\t%s' "$unlock")"
+          test "$changed" = "$expected_change"
+          test "$(git rev-list --all --count -- "$unlock")" -eq 1
+
+          original_unlock='transient-globaldkd/VALIDATION_UNLOCK'
+          original_expected='UNLOCK_SPANISH_OUTCOMES_ONCE discovery=41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f boundary=32cb40dc46b1eb4a5d505b6b81db114ba2f23d99'
+          printf '%s\n' "$original_expected" > "$RUNNER_TEMP/original-unlock"
+          cmp -s "$RUNNER_TEMP/original-unlock" "$original_unlock"
+          test "$(git rev-list --all --count -- "$original_unlock")" -eq 1
+
+          python -m py_compile \
+            transient-globaldkd/validate_spain_locked.py \
+            transient-globaldkd/discover_windows.py
+          test "$(git hash-object transient-globaldkd/validate_spain_locked.py)" = \
+            "31d27db599c05fe982b2f21fd8210b7843b2e2b3"
+          test "$(git hash-object transient-globaldkd/ATTEMPT_1_FAILURE.md)" = \
+            "8eda3f95ee87fb05c46f30e766bab39f62c9bd90"
+          grep -Fq 'Workflow run: `31009572812`' \
+            transient-globaldkd/ATTEMPT_1_FAILURE.md
+          grep -Fq 'did not construct threshold classes' \
+            transient-globaldkd/ATTEMPT_1_FAILURE.md
+
+          test "$(git hash-object transient-globaldkd/discover_windows.py)" = \
+            "a8f820e21aa51fcbfd2ed0b4e9144e8a51239d74"
+          test "$(sha256sum transient-globaldkd/discover_windows.py | cut -d' ' -f1)" = \
+            "f86232f2c94cf82a4d3b4dd8ae357a13fbf6edf22db2a27bf9b1b527d2eb1fa3"
+          test "$(git hash-object transient-globaldkd/PREREGISTRATION.md)" = \
+            "77391453057c193e4d6d62e5918b002fd36aefae"
+          test "$(sha256sum transient-globaldkd/PREREGISTRATION.md | cut -d' ' -f1)" = \
+            "200dde3ff02feac834f6b6b804d33af62226965576cd4acf30388225d0718b68"
+          test "$(git hash-object transient-globaldkd/frozen-discovery/frozen-discovery.json)" = \
+            "9e87e7a71a848656cac9df0263cde133ed3524ea"
+          test "$(sha256sum transient-globaldkd/frozen-discovery/frozen-discovery.json | cut -d' ' -f1)" = \
+            "41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f"
+          (
+            cd transient-globaldkd/frozen-discovery
+            sha256sum --check --strict frozen-discovery.sha256
+            sha256sum --check --strict fold-manifest.sha256
+          )
+          grep -Fq \
+            'k computational source-spectrum windows create 2k digital features' \
+            transient-globaldkd/ARTIFACT_ERRATUM.md
+          test ! -e transient-globaldkd/outputs/spanish-validation-retry1
+
+      - name: Install pinned validation dependencies
+        run: |
+          python -m pip install --disable-pip-version-check \
+            -r transient-globaldkd/requirements-discovery.txt
+
+      - name: Download and verify versioned public archive
+        run: |
+          mkdir -p transient-globaldkd/data
+          curl --fail --location \
+            --retry 10 --retry-all-errors --retry-delay 15 \
+            'https://zenodo.org/records/14762603/files/GlobalDKD.zip?download=1' \
+            --output transient-globaldkd/data/GlobalDKD.zip
+          echo '8d5d4ba0e0578d0e39e76e1f1514a841  transient-globaldkd/data/GlobalDKD.zip' \
+            | md5sum --check --strict
+
+      - name: Execute frozen ESP-only technical retry
+        run: |
+          python transient-globaldkd/validate_spain_locked.py \
+            transient-globaldkd/data/GlobalDKD.zip \
+            transient-globaldkd/frozen-discovery/frozen-discovery.json \
+            transient-globaldkd/frozen-discovery/frozen-discovery.sha256 \
+            transient-globaldkd/outputs/spanish-validation-retry1 \
+            --reviewed-discovery-sha256 \
+            41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f \
+            --unlock-spanish-confirmation
+
+      - name: Print frozen retry summary and digest
+        if: always()
+        run: |
+          if [ -f transient-globaldkd/outputs/spanish-validation-retry1/validation-summary.json ]; then
+            cat transient-globaldkd/outputs/spanish-validation-retry1/validation-summary.json
+          fi
+          if [ -f transient-globaldkd/outputs/spanish-validation-retry1/frozen-validation.sha256 ]; then
+            cat transient-globaldkd/outputs/spanish-validation-retry1/frozen-validation.sha256
+          fi
+
+      - name: Always upload technical-retry outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: globaldkd-spanish-validation-technical-retry1
+          path: transient-globaldkd/outputs/spanish-validation-retry1/
+          if-no-files-found: warn
+          retention-days: 7
