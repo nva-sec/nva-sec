@@ -40,6 +40,16 @@ jobs:
             transient-globaldkd/data/GlobalDKD.zip \
             transient-globaldkd/outputs/schema-audit
 
+      - name: Print schema-only artifact for review
+        if: always()
+        run: |
+          if [ -f transient-globaldkd/outputs/schema-audit/README.md ]; then
+            cat transient-globaldkd/outputs/schema-audit/README.md
+          fi
+          if [ -f transient-globaldkd/outputs/schema-audit/schema-audit.json ]; then
+            cat transient-globaldkd/outputs/schema-audit/schema-audit.json
+          fi
+
       - name: Upload schema audit
         if: always()
         uses: actions/upload-artifact@v4
