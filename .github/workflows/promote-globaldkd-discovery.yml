@@ -123,11 +123,16 @@ jobs:
           assert hashlib.sha256(prereg).hexdigest() == (
               value["input"]["preregistration_sha256"]
           )
-          assert value["input"]["archive_members_read"] == [
-              "Zenodo/dataset.mat"
+          isolation = value["isolation_guard"]
+          assert isolation["archive_members_read"] == ["Zenodo/dataset.mat"]
+          assert isolation["loadmat_variable_names"] == ["AUS_Int"]
+          assert isolation["loaded_public_variables"] == ["AUS_Int"]
+          assert isolation["forbidden_variables_not_loaded"] == [
+              "ESP",
+              "Global",
           ]
-          assert value["input"]["mat_variables_requested"] == ["AUS_Int"]
-          assert value["input"]["spanish_outcomes_read"] is False
+          assert isolation["spanish_reference_workbook_opened"] is False
+          assert isolation["spanish_outcomes_read"] is False
           assert value["status"] == "DESIGN"
           PY
           sha256sum discovery-summary.json fold-manifest.json \
