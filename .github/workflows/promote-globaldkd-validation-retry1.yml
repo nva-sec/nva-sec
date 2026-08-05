@@ -1,0 +1,260 @@
+name: Promote exact frozen GlobalDKD validation technical retry 1
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/promote-globaldkd-validation-retry1.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: promote-globaldkd-validation-retry1
+  cancel-in-progress: false
+
+jobs:
+  promote-frozen-validation:
+    if: >-
+      github.repository == 'nva-sec/nva-sec' &&
+      github.event.pull_request.head.ref == 'transient/globaldkd-schema-20260805'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: transient/globaldkd-schema-20260805
+          fetch-depth: 0
+
+      - name: Verify successful technical-retry run, job, and artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_json="$(gh run view 31010663111 --repo "$GITHUB_REPOSITORY" \
+            --json databaseId,headSha,headBranch,conclusion,event)"
+          test "$(jq -r .databaseId <<<"$run_json")" = "31010663111"
+          test "$(jq -r .headSha <<<"$run_json")" = \
+            "eaa9611bd67b662987a307f85e5fd08a67e235d0"
+          test "$(jq -r .headBranch <<<"$run_json")" = \
+            "transient/globaldkd-schema-20260805"
+          test "$(jq -r .conclusion <<<"$run_json")" = "success"
+          test "$(jq -r .event <<<"$run_json")" = "push"
+
+          jobs_json="$(gh api \
+            "/repos/$GITHUB_REPOSITORY/actions/runs/31010663111/jobs")"
+          test "$(jq '[.jobs[] | select(.id == 92321693370 and .name == "validate-spain-technical-retry1" and .conclusion == "success")] | length' <<<"$jobs_json")" = "1"
+
+          artifact_json="$(gh api \
+            "/repos/$GITHUB_REPOSITORY/actions/artifacts/8932293583")"
+          test "$(jq -r .id <<<"$artifact_json")" = "8932293583"
+          test "$(jq -r .name <<<"$artifact_json")" = \
+            "globaldkd-spanish-validation-technical-retry1"
+          test "$(jq -r .workflow_run.id <<<"$artifact_json")" = "31010663111"
+          test "$(jq -r .workflow_run.head_sha <<<"$artifact_json")" = \
+            "eaa9611bd67b662987a307f85e5fd08a67e235d0"
+          test "$(jq -r .digest <<<"$artifact_json")" = \
+            "sha256:cf0d38f6844bf6ff981c9b43da6b4f5dac1d8da6d0957d14b0e7b560ea650f1f"
+
+      - name: Download by run and verify exact artifact ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/by-run" "$RUNNER_TEMP/by-id"
+          gh run download 31010663111 --repo "$GITHUB_REPOSITORY" \
+            --name globaldkd-spanish-validation-technical-retry1 \
+            --dir "$RUNNER_TEMP/by-run"
+          gh api \
+            "/repos/$GITHUB_REPOSITORY/actions/artifacts/8932293583/zip" \
+            > "$RUNNER_TEMP/globaldkd-spanish-validation-retry1.zip"
+          echo "cf0d38f6844bf6ff981c9b43da6b4f5dac1d8da6d0957d14b0e7b560ea650f1f  $RUNNER_TEMP/globaldkd-spanish-validation-retry1.zip" \
+            | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/globaldkd-spanish-validation-retry1.zip" \
+            -d "$RUNNER_TEMP/by-id"
+          diff -qr "$RUNNER_TEMP/by-run" "$RUNNER_TEMP/by-id"
+
+      - name: Verify exact files, canonical payload, linkage, schema, and gates
+        env:
+          SOURCE_DIR: ${{ runner.temp }}/by-id
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_DIR"
+          find . -mindepth 1 -maxdepth 1 -type f -printf '%f\n' | sort \
+            > "$RUNNER_TEMP/observed-files.txt"
+          printf '%s\n' \
+            frozen-validation.json \
+            frozen-validation.sha256 \
+            validation-summary.json \
+            > "$RUNNER_TEMP/expected-files.txt"
+          diff -u "$RUNNER_TEMP/expected-files.txt" "$RUNNER_TEMP/observed-files.txt"
+          test "$(find . -mindepth 1 -maxdepth 1 | wc -l)" -eq 3
+          test "$(cat frozen-validation.sha256)" = \
+            "fb1111b4e0539f854c60bbb11c6211632d3162cb5ccb1505736bed9085a33da4  frozen-validation.json"
+          sha256sum --check --strict frozen-validation.sha256
+          test "$(sha256sum frozen-validation.json | cut -d' ' -f1)" = \
+            "fb1111b4e0539f854c60bbb11c6211632d3162cb5ccb1505736bed9085a33da4"
+
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          source = Path(os.environ["SOURCE_DIR"])
+          raw = (source / "frozen-validation.json").read_bytes()
+          obj = json.loads(
+              raw,
+              parse_constant=lambda value: (_ for _ in ()).throw(
+                  ValueError(f"nonfinite JSON token: {value}")
+              ),
+          )
+          canonical = (
+              json.dumps(
+                  obj,
+                  sort_keys=True,
+                  separators=(",", ":"),
+                  ensure_ascii=False,
+                  allow_nan=False,
+              )
+              + "\n"
+          ).encode("utf-8")
+          assert raw == canonical
+          digest = hashlib.sha256(raw).hexdigest()
+          assert digest == "fb1111b4e0539f854c60bbb11c6211632d3162cb5ccb1505736bed9085a33da4"
+
+          discovery = "41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f"
+          assert obj["schema_version"] == "globaldkd-sparse-window-validation-v1"
+          assert obj["phase"] == "ONE-SHOT SPANISH CONFIRMATION"
+          assert obj["linkage"]["frozen_discovery_sha256"] == discovery
+          assert obj["linkage"]["reviewed_discovery_sha256"] == discovery
+          assert obj["linkage"]["selected_centers_cm_inverse"] == [3360, 3296]
+          assert obj["linkage"]["sparse_threshold_from_Australia"] == 0.4163771802886031
+          assert obj["linkage"]["all_window_threshold_from_Australia"] == 0.3504188602816945
+          assert obj["linkage"]["no_refit_or_recalibration"] is True
+
+          inp = obj["input"]
+          assert inp["archive_md5"] == "8d5d4ba0e0578d0e39e76e1f1514a841"
+          assert inp["mat_member"] == "Zenodo/dataset.mat"
+          assert inp["loadmat_variable_names"] == ["ESP"]
+          assert inp["Global_not_loaded"] is True
+          assert inp["ESP_data_already_contains_source_0_8_correction"] is True
+
+          cohort = obj["cohort"]
+          assert (cohort["n"], cohort["positive"], cohort["negative"]) == (61, 34, 27)
+          assert cohort["site_counts"] == {"Madrid": 15, "Valencia": 46}
+          assert "left-censored" in cohort["reference_interpretation"]
+
+          expected_assertions = {
+              "reviewed_discovery_digest_exact",
+              "discovery_status_DESIGN",
+              "ESP_only",
+              "shape_61_by_1598",
+              "axis_grid_3994_to_800_step_minus_2",
+              "ESP_axisscale_object_container_shape_2_by_2",
+              "ESP_label_object_container_shape_2_by_2",
+              "empty_axis_label_cells_U1_shape_0",
+              "label_ID_cell_Unicode_shape_61",
+              "empty_label_cells_U1_shape_0",
+              "unique_spanish_ids",
+              "sites_derived_from_audited_ID_prefixes",
+              "audited_Valencia_then_Madrid_block_order",
+              "counts_34_27",
+              "sites_46_15",
+              "frozen_scaler_model_threshold",
+              "paired_bootstrap_indices",
+              "within_site_permutation",
+              "no_refit_recalibration_reselection",
+              "all_outputs_finite_or_explicitly_null",
+          }
+          assert set(obj["assertions"]) == expected_assertions
+          assert all(value is True for value in obj["assertions"].values())
+
+          metrics = obj["primary_sparse"]["metrics"]
+          gates = obj["primary_sparse"]["external_success_gates"]
+          bootstrap = obj["primary_sparse"]["bootstrap"]
+          assert metrics["auroc"] == 0.9803921568627451
+          assert metrics["sensitivity"] == 0.9411764705882353
+          assert metrics["specificity"] == 0.8518518518518519
+          assert gates["overall_pass"] is True
+          for key in (
+              "auroc",
+              "sensitivity",
+              "specificity",
+              "sparse_minus_all_window_auroc",
+          ):
+              assert gates[key]["pass"] is True
+              assert gates[key]["point"] >= gates[key]["minimum"]
+          assert gates["auroc"]["point"] == metrics["auroc"]
+          assert gates["sensitivity"]["point"] == metrics["sensitivity"]
+          assert gates["specificity"]["point"] == metrics["specificity"]
+          assert gates["sparse_minus_all_window_auroc"]["point"] == \
+              bootstrap["sparse_minus_all_window_auroc"]
+          assert bootstrap["site_class_stratum_sizes"] == {
+              "Madrid|0": 2,
+              "Madrid|1": 13,
+              "Valencia|0": 25,
+              "Valencia|1": 21,
+          }
+          assert len(obj["predictions"]) == 61
+
+          summary_raw = (source / "validation-summary.json").read_bytes()
+          assert summary_raw.endswith(b"\n")
+          summary = json.loads(summary_raw)
+          assert summary["phase"] == obj["phase"]
+          assert summary["frozen_discovery_sha256"] == discovery
+          assert summary["frozen_validation_sha256"] == digest
+          assert summary["selected_centers_cm_inverse"] == [3360, 3296]
+          assert summary["primary_sparse"] == obj["primary_sparse"]
+          assert summary["all_window_comparator"] == obj["all_window_comparator"]
+          assert summary["site_metrics"] == obj["site_metrics"]
+          assert summary["negative_controls"] == {
+              key: value["metrics"]
+              for key, value in obj["negative_controls"].items()
+          }
+          assert summary["robustness"] == {
+              key: value["metrics_at_nominal_frozen_threshold"]
+              for key, value in obj["robustness_nominal_model_only"].items()
+          }
+          print("validated frozen validation:", digest)
+          PY
+
+      - name: Verify immutable source and technical-retry disclosure
+        run: |
+          set -euo pipefail
+          test "$(git hash-object transient-globaldkd/validate_spain_locked.py)" = \
+            "31d27db599c05fe982b2f21fd8210b7843b2e2b3"
+          test "$(git hash-object transient-globaldkd/ATTEMPT_1_FAILURE.md)" = \
+            "8eda3f95ee87fb05c46f30e766bab39f62c9bd90"
+          grep -Fq 'Workflow run: `31009572812`' \
+            transient-globaldkd/ATTEMPT_1_FAILURE.md
+          grep -Fq 'Any subsequent execution is labeled a technical retry' \
+            transient-globaldkd/ATTEMPT_1_FAILURE.md
+          test "$(git hash-object transient-globaldkd/ARTIFACT_ERRATUM.md)" = \
+            "54f3163901dfa0d640600cf48df1d5d31ccbcd32"
+
+      - name: Promote exact three immutable files
+        env:
+          SOURCE_DIR: ${{ runner.temp }}/by-id
+        run: |
+          set -euo pipefail
+          destination='transient-globaldkd/frozen-validation'
+          test ! -e "$destination"
+          mkdir "$destination"
+          cp "$SOURCE_DIR/frozen-validation.json" "$destination/"
+          cp "$SOURCE_DIR/frozen-validation.sha256" "$destination/"
+          cp "$SOURCE_DIR/validation-summary.json" "$destination/"
+          git diff --exit-code -- "$destination" || true
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add "$destination"
+          test "$(git diff --cached --name-only | wc -l)" -eq 3
+          git commit -m "Promote exact frozen Spanish validation technical retry 1 [skip ci]"
+          git push origin HEAD:transient/globaldkd-schema-20260805
+          echo "promoted_commit=$(git rev-parse HEAD)"
+
+      - name: Print promoted file digests
+        run: |
+          sha256sum transient-globaldkd/frozen-validation/*
