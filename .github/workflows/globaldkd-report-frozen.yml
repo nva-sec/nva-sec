@@ -69,7 +69,8 @@ jobs:
             transient-globaldkd/generate_report.py
           grep -Fq 'schema-only technical retry 1' \
             transient-globaldkd/generate_report.py
-          grep -Fq '0/15/282/2678' transient-globaldkd/generate_report.py
+          grep -Fq 'qualifying_by_k != [0, 15, 282, 2678]' \
+            transient-globaldkd/generate_report.py
           grep -Fq 'sharing the 3328 cm⁻¹ boundary' \
             transient-globaldkd/generate_report.py
           grep -Fq 'did not construct threshold classes' \
