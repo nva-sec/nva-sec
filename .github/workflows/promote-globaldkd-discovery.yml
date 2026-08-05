@@ -93,9 +93,11 @@ jobs:
           python - <<'PY'
           import hashlib
           import json
+          import os
           from pathlib import Path
 
           root = Path(".")
+          workspace = Path(os.environ["GITHUB_WORKSPACE"])
           payload = (root / "frozen-discovery.json").read_bytes()
           value = json.loads(payload)
           canonical = json.dumps(
@@ -109,11 +111,11 @@ jobs:
           assert hashlib.sha256(payload).hexdigest() == (
               "41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f"
           )
-          script = Path(
-              "$GITHUB_WORKSPACE/transient-globaldkd/discover_windows.py"
+          script = (
+              workspace / "transient-globaldkd" / "discover_windows.py"
           ).read_bytes()
-          prereg = Path(
-              "$GITHUB_WORKSPACE/transient-globaldkd/PREREGISTRATION.md"
+          prereg = (
+              workspace / "transient-globaldkd" / "PREREGISTRATION.md"
           ).read_bytes()
           assert hashlib.sha256(script).hexdigest() == value["input"]["code_sha256"]
           assert hashlib.sha256(prereg).hexdigest() == (
