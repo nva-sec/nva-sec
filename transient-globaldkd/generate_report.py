@@ -483,6 +483,13 @@ def make_report(
             f"- Sensitivity {fmt(metrics['sensitivity'])}; specificity "
             f"{fmt(metrics['specificity'])}; Wilson intervals are in the artifact.",
             f"- Sparse-minus-24-window AUROC {fmt(delta)}.",
+            "- The 24-window comparator had the same sensitivity "
+            f"({fmt(validation['all_window_comparator']['metrics']['sensitivity'])}) "
+            "but one false positive, versus four for the sparse model.",
+            "- The selected 3360 and 3296 cm⁻¹ windows are adjacent closed "
+            "64 cm⁻¹ intervals sharing the 3328 cm⁻¹ boundary. They are "
+            "computational summaries, not evidence for two independent "
+            "physical channels.",
             f"- Prespecified Spanish gates from the frozen validation artifact: "
             f"{'PASS' if passed else 'FAIL'}.",
         ]
@@ -545,6 +552,12 @@ def make_report(
                 f"{row['tp']}/{row['fn']}/{row['tn']}/{row['fp']} |"
             )
         lines += [
+            "",
+            "**Operating-point warning.** The ±8/±16 cm⁻¹ common shifts "
+            "preserved rank discrimination (AUROC 0.976–0.983) but did not "
+            "preserve the frozen-threshold operating point: specificity fell "
+            "to 0.704 and 0.630 for +8/+16, while sensitivity fell to 0.706 "
+            "for −16. This further limits any physical-channel interpretation.",
             "",
             "**Interpretive warning.** Both Spanish negative controls showed "
             "high discrimination (AUROC above 0.92). That pattern is compatible "
