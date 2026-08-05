@@ -4,9 +4,15 @@ on:
   push:
     branches:
       - transient/globaldkd-schema-20260805
+    paths-ignore:
+      - '.github/workflows/promote-globaldkd-discovery.yml'
+      - 'transient-globaldkd/frozen-discovery/**'
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - '.github/workflows/promote-globaldkd-discovery.yml'
+      - 'transient-globaldkd/frozen-discovery/**'
 
 permissions:
   contents: read
