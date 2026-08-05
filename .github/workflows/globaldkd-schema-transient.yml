@@ -6,13 +6,23 @@ on:
       - transient/globaldkd-schema-20260805
     paths-ignore:
       - '.github/workflows/promote-globaldkd-discovery.yml'
+      - '.github/workflows/globaldkd-validation-one-shot.yml'
       - 'transient-globaldkd/frozen-discovery/**'
+      - 'transient-globaldkd/validate_spain_locked.py'
+      - 'transient-globaldkd/VALIDATION_UNLOCK'
+      - 'transient-globaldkd/outputs/validation/**'
+      - 'transient-globaldkd/ARTIFACT_ERRATUM.md'
   pull_request:
     branches:
       - main
     paths-ignore:
       - '.github/workflows/promote-globaldkd-discovery.yml'
+      - '.github/workflows/globaldkd-validation-one-shot.yml'
       - 'transient-globaldkd/frozen-discovery/**'
+      - 'transient-globaldkd/validate_spain_locked.py'
+      - 'transient-globaldkd/VALIDATION_UNLOCK'
+      - 'transient-globaldkd/outputs/validation/**'
+      - 'transient-globaldkd/ARTIFACT_ERRATUM.md'
 
 permissions:
   contents: read
