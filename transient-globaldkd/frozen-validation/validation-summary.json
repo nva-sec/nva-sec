@@ -1,0 +1,336 @@
+{
+  "all_window_comparator": {
+    "metrics": {
+      "auroc": 0.985838779956427,
+      "fn": 2,
+      "fp": 1,
+      "n": 61,
+      "negative": 27,
+      "positive": 34,
+      "sensitivity": 0.9411764705882353,
+      "sensitivity_wilson_95": [
+        0.80906393095719,
+        0.9837173447898772
+      ],
+      "specificity": 0.9629629629629629,
+      "specificity_wilson_95": [
+        0.8171653406642414,
+        0.9934318540192149
+      ],
+      "threshold": 0.3504188602816945,
+      "tn": 26,
+      "tp": 32
+    }
+  },
+  "frozen_discovery_sha256": "41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f",
+  "frozen_validation_sha256": "fb1111b4e0539f854c60bbb11c6211632d3162cb5ccb1505736bed9085a33da4",
+  "negative_controls": {
+    "atmospheric_instrument_artifact": {
+      "auroc": 0.9455337690631809,
+      "fn": 1,
+      "fp": 7,
+      "n": 61,
+      "negative": 27,
+      "positive": 34,
+      "sensitivity": 0.9705882352941176,
+      "sensitivity_wilson_95": [
+        0.8508442670731406,
+        0.9947890937237309
+      ],
+      "specificity": 0.7407407407407407,
+      "specificity_wilson_95": [
+        0.5532142868544692,
+        0.8682962543809281
+      ],
+      "threshold": 0.24624880282516962,
+      "tn": 20,
+      "tp": 33
+    },
+    "clean_off_target": {
+      "auroc": 0.9259259259259259,
+      "fn": 2,
+      "fp": 11,
+      "n": 61,
+      "negative": 27,
+      "positive": 34,
+      "sensitivity": 0.9411764705882353,
+      "sensitivity_wilson_95": [
+        0.80906393095719,
+        0.9837173447898772
+      ],
+      "specificity": 0.5925925925925926,
+      "specificity_wilson_95": [
+        0.4072670096806468,
+        0.7548524292560443
+      ],
+      "threshold": 0.2895558013355162,
+      "tn": 16,
+      "tp": 32
+    }
+  },
+  "phase": "ONE-SHOT SPANISH CONFIRMATION",
+  "primary_sparse": {
+    "bootstrap": {
+      "all_window_auroc_ci_95": [
+        0.957516339869281,
+        1.0
+      ],
+      "method": "percentile bootstrap within site x class",
+      "paired_sparse_comparator_indices": true,
+      "replicates": 10000,
+      "seed": 20260812,
+      "site_class_stratum_sizes": {
+        "Madrid|0": 2,
+        "Madrid|1": 13,
+        "Valencia|0": 25,
+        "Valencia|1": 21
+      },
+      "sparse_auroc_ci_95": [
+        0.9477124183006536,
+        1.0
+      ],
+      "sparse_minus_all_window_auroc": -0.005446623093681935,
+      "sparse_minus_all_window_auroc_ci_95": [
+        -0.02941176470588236,
+        0.017429193899782147
+      ]
+    },
+    "calibration": {
+      "exploratory": true,
+      "intercept": -0.595633864373586,
+      "slope": 1.3517949249350034,
+      "status": "estimated",
+      "warning": "balanced-class-weight logistic scores are not calibrated probabilities"
+    },
+    "external_success_gates": {
+      "auroc": {
+        "minimum": 0.9,
+        "pass": true,
+        "point": 0.9803921568627451
+      },
+      "overall_pass": true,
+      "sensitivity": {
+        "minimum": 0.85,
+        "pass": true,
+        "point": 0.9411764705882353
+      },
+      "sparse_minus_all_window_auroc": {
+        "minimum": -0.1,
+        "pass": true,
+        "point": -0.005446623093681935
+      },
+      "specificity": {
+        "minimum": 0.75,
+        "pass": true,
+        "point": 0.8518518518518519
+      }
+    },
+    "metrics": {
+      "auroc": 0.9803921568627451,
+      "fn": 2,
+      "fp": 4,
+      "n": 61,
+      "negative": 27,
+      "positive": 34,
+      "sensitivity": 0.9411764705882353,
+      "sensitivity_wilson_95": [
+        0.80906393095719,
+        0.9837173447898772
+      ],
+      "specificity": 0.8518518518518519,
+      "specificity_wilson_95": [
+        0.6752131457218702,
+        0.9408407222375568
+      ],
+      "threshold": 0.4163771802886031,
+      "tn": 23,
+      "tp": 32
+    },
+    "within_site_permutation": {
+      "alternative": "greater",
+      "exceed": 0,
+      "observed": 0.9803921568627451,
+      "p_value": 9.999000099990002e-05,
+      "permutations": 10000,
+      "seed": 20260813,
+      "shuffle": "labels within site only",
+      "statistic": "AUROC"
+    }
+  },
+  "robustness": {
+    "common_shift_+16_cm_inverse": {
+      "auroc": 0.9760348583877996,
+      "fn": 1,
+      "fp": 10,
+      "n": 61,
+      "negative": 27,
+      "positive": 34,
+      "sensitivity": 0.9705882352941176,
+      "sensitivity_wilson_95": [
+        0.8508442670731406,
+        0.9947890937237309
+      ],
+      "specificity": 0.6296296296296297,
+      "specificity_wilson_95": [
+        0.4422923441210239,
+        0.784674870390344
+      ],
+      "threshold": 0.4163771802886031,
+      "tn": 17,
+      "tp": 33
+    },
+    "common_shift_+8_cm_inverse": {
+      "auroc": 0.9782135076252723,
+      "fn": 1,
+      "fp": 8,
+      "n": 61,
+      "negative": 27,
+      "positive": 34,
+      "sensitivity": 0.9705882352941176,
+      "sensitivity_wilson_95": [
+        0.8508442670731406,
+        0.9947890937237309
+      ],
+      "specificity": 0.7037037037037037,
+      "specificity_wilson_95": [
+        0.5151931703585185,
+        0.8414695953022023
+      ],
+      "threshold": 0.4163771802886031,
+      "tn": 19,
+      "tp": 33
+    },
+    "common_shift_-16_cm_inverse": {
+      "auroc": 0.9793028322440087,
+      "fn": 10,
+      "fp": 0,
+      "n": 61,
+      "negative": 27,
+      "positive": 34,
+      "sensitivity": 0.7058823529411765,
+      "sensitivity_wilson_95": [
+        0.5383109020528557,
+        0.8316536932957758
+      ],
+      "specificity": 1.0,
+      "specificity_wilson_95": [
+        0.8754449702581328,
+        0.9999999999999998
+      ],
+      "threshold": 0.4163771802886031,
+      "tn": 27,
+      "tp": 24
+    },
+    "common_shift_-8_cm_inverse": {
+      "auroc": 0.9825708061002179,
+      "fn": 3,
+      "fp": 0,
+      "n": 61,
+      "negative": 27,
+      "positive": 34,
+      "sensitivity": 0.9117647058823529,
+      "sensitivity_wilson_95": [
+        0.7703951343719113,
+        0.9695340563253514
+      ],
+      "specificity": 1.0,
+      "specificity_wilson_95": [
+        0.8754449702581328,
+        0.9999999999999998
+      ],
+      "threshold": 0.4163771802886031,
+      "tn": 27,
+      "tp": 31
+    },
+    "width_48_cm_inverse": {
+      "auroc": 0.9803921568627451,
+      "fn": 2,
+      "fp": 6,
+      "n": 61,
+      "negative": 27,
+      "positive": 34,
+      "sensitivity": 0.9411764705882353,
+      "sensitivity_wilson_95": [
+        0.80906393095719,
+        0.9837173447898772
+      ],
+      "specificity": 0.7777777777777778,
+      "specificity_wilson_95": [
+        0.5924307113336742,
+        0.8939276054763996
+      ],
+      "threshold": 0.4163771802886031,
+      "tn": 21,
+      "tp": 32
+    },
+    "width_80_cm_inverse": {
+      "auroc": 0.9803921568627451,
+      "fn": 2,
+      "fp": 2,
+      "n": 61,
+      "negative": 27,
+      "positive": 34,
+      "sensitivity": 0.9411764705882353,
+      "sensitivity_wilson_95": [
+        0.80906393095719,
+        0.9837173447898772
+      ],
+      "specificity": 0.9259259259259259,
+      "specificity_wilson_95": [
+        0.7663040731697686,
+        0.9794453459390113
+      ],
+      "threshold": 0.4163771802886031,
+      "tn": 25,
+      "tp": 32
+    }
+  },
+  "selected_centers_cm_inverse": [
+    3360,
+    3296
+  ],
+  "site_metrics": {
+    "Madrid": {
+      "auroc": 0.9615384615384616,
+      "fn": 2,
+      "fp": 0,
+      "n": 15,
+      "negative": 2,
+      "positive": 13,
+      "sensitivity": 0.8461538461538461,
+      "sensitivity_wilson_95": [
+        0.5776536898051745,
+        0.9567418216419186
+      ],
+      "specificity": 1.0,
+      "specificity_wilson_95": [
+        0.34238022750665303,
+        1.0
+      ],
+      "threshold": 0.4163771802886031,
+      "tn": 2,
+      "tp": 11
+    },
+    "Valencia": {
+      "auroc": 1.0,
+      "fn": 0,
+      "fp": 4,
+      "n": 46,
+      "negative": 25,
+      "positive": 21,
+      "sensitivity": 1.0,
+      "sensitivity_wilson_95": [
+        0.8453609810751531,
+        1.0
+      ],
+      "specificity": 0.84,
+      "specificity_wilson_95": [
+        0.6534637839282114,
+        0.9359654854332355
+      ],
+      "threshold": 0.4163771802886031,
+      "tn": 21,
+      "tp": 21
+    }
+  }
+}
