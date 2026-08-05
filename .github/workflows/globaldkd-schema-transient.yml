@@ -1,4 +1,4 @@
-name: Transient GlobalDKD schema audit
+name: Transient GlobalDKD Australian discovery
 
 on:
   push:
@@ -11,10 +11,18 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHONHASHSEED: '0'
+  OMP_NUM_THREADS: '1'
+  OPENBLAS_NUM_THREADS: '1'
+  MKL_NUM_THREADS: '1'
+  VECLIB_MAXIMUM_THREADS: '1'
+  NUMEXPR_NUM_THREADS: '1'
+
 jobs:
-  schema-audit:
+  australian-discovery:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -22,10 +30,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install schema-audit dependencies
-        run: python -m pip install --disable-pip-version-check -r transient-globaldkd/requirements-schema.txt
+      - name: Install pinned discovery dependencies
+        run: python -m pip install --disable-pip-version-check -r transient-globaldkd/requirements-discovery.txt
 
-      - name: Download versioned public archive
+      - name: Download and verify versioned public archive
         run: |
           mkdir -p transient-globaldkd/data
           curl --fail --location \
@@ -34,41 +42,31 @@ jobs:
             --output transient-globaldkd/data/GlobalDKD.zip
           echo '8d5d4ba0e0578d0e39e76e1f1514a841  transient-globaldkd/data/GlobalDKD.zip' | md5sum --check --strict
 
-      - name: Audit archive schema and donor inventory only
+      - name: Run Australian-only exhaustive discovery
         run: |
-          python transient-globaldkd/schema_audit.py \
+          python transient-globaldkd/discover_windows.py \
             transient-globaldkd/data/GlobalDKD.zip \
-            transient-globaldkd/outputs/schema-audit
+            transient-globaldkd/outputs/discovery \
+            transient-globaldkd/PREREGISTRATION.md
 
-      - name: Deepen MATLAB and live-script schema without numeric values
+      - name: Print discovery summary and frozen digests
         if: always()
         run: |
-          python transient-globaldkd/schema_deepener.py \
-            transient-globaldkd/data/GlobalDKD.zip \
-            transient-globaldkd/outputs/schema-audit
+          if [ -f transient-globaldkd/outputs/discovery/discovery-summary.json ]; then
+            cat transient-globaldkd/outputs/discovery/discovery-summary.json
+          fi
+          if [ -f transient-globaldkd/outputs/discovery/frozen-discovery.sha256 ]; then
+            cat transient-globaldkd/outputs/discovery/frozen-discovery.sha256
+          fi
+          if [ -f transient-globaldkd/outputs/discovery/fold-manifest.sha256 ]; then
+            cat transient-globaldkd/outputs/discovery/fold-manifest.sha256
+          fi
 
-      - name: Print schema-only artifact for review
-        if: always()
-        run: |
-          for audit_file in \
-            README.md \
-            schema-audit.json \
-            deep-mat-schema.json \
-            DATASET.complete-code.txt \
-            mlx-symbol-context.txt
-          do
-            artifact_path="transient-globaldkd/outputs/schema-audit/${audit_file}"
-            if [ -f "${artifact_path}" ]; then
-              echo "===== ${audit_file} ====="
-              cat "${artifact_path}"
-            fi
-          done
-
-      - name: Upload schema audit
+      - name: Upload frozen Australian discovery
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: globaldkd-schema-audit
-          path: transient-globaldkd/outputs/schema-audit/
+          name: globaldkd-australian-discovery
+          path: transient-globaldkd/outputs/discovery/
           if-no-files-found: warn
           retention-days: 7
