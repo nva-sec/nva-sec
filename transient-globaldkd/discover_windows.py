@@ -106,10 +106,10 @@ def load_australia_only(archive: Path) -> dict:
         raise RuntimeError(f"archive MD5 mismatch: {observed_md5}")
 
     with zipfile.ZipFile(archive) as bundle:
-        names = set(bundle.namelist())
-        if MAT_MEMBER not in names:
-            raise RuntimeError(f"missing archive member: {MAT_MEMBER}")
-        mat_payload = bundle.read(MAT_MEMBER)
+        try:
+            mat_payload = bundle.read(MAT_MEMBER)
+        except KeyError as error:
+            raise RuntimeError(f"missing archive member: {MAT_MEMBER}") from error
 
     loaded = loadmat(
         io.BytesIO(mat_payload),
@@ -464,6 +464,16 @@ def candidate_record(
         "threshold": metrics["threshold"],
         "sensitivity": metrics["sensitivity"],
         "specificity": metrics["specificity"],
+        "tp": metrics["tp"],
+        "fn": metrics["fn"],
+        "tn": metrics["tn"],
+        "fp": metrics["fp"],
+        "required_positive_rank": metrics["required_positive_rank"],
+        "threshold_rule": metrics["threshold_rule"],
+        "all_window_comparator_auroc": comparator_auroc,
+        "auroc_minus_all_window": finite_float(
+            metrics["auroc"] - comparator_auroc
+        ),
         "qualifies": bool(qualifies),
     }
 
@@ -1060,14 +1070,27 @@ def main() -> None:
         },
         "assertions": {
             "archive_md5": True,
-            "AUS_Int_only": True,
+            "exact_archive_member_read_without_inventory_listing": True,
+            "loadmat_requested_AUS_Int_only": True,
+            "forbidden_ESP_Global_not_deserialized": True,
+            "AUS_Int_simplified_to_dict": True,
             "shape_177_by_1598": True,
-            "unique_AU_ids": True,
+            "albumin_axis_shape_177": True,
+            "wavenumber_axis_shape_1598": True,
+            "duplicate_albumin_axes_equal_including_nan": True,
+            "albumin_axis_label_exact": True,
+            "wavenumber_axis_label_exact": True,
+            "spectra_and_wavenumbers_finite": True,
+            "wavenumber_axis_strictly_monotone": True,
+            "all_windows_within_axis_coverage": True,
+            "unique_nonblank_AU_ids": True,
             "first_22_albumin_missing": True,
             "primary_n_155": True,
             "primary_counts_64_91": True,
-            "candidate_count_12950": True,
+            "candidate_count_12950_unique": True,
             "no_cross_label_exact_duplicate": True,
+            "no_zero_or_near_zero_rms_or_L2_norm": True,
+            "no_logistic_convergence_warning": True,
             "all_numeric_outputs_finite": True,
         },
     }
