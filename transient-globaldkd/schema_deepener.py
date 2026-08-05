@@ -13,6 +13,7 @@ import re
 import sys
 import tempfile
 import zipfile
+from collections import Counter
 from pathlib import Path
 from xml.etree import ElementTree
 
