@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 2
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -43,14 +43,180 @@ jobs:
         run: |
           set -euo pipefail
           unlock='transient-globaldkd/VALIDATION_UNLOCK'
-          expected='UNLOCK_SPANISH_OUTCOMES_ONCE 41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f'
+          boundary_ref='refs/remotes/origin/globaldkd-validation-boundary'
+          git fetch --no-tags origin \
+            refs/heads/transient/globaldkd-validation-boundary-20260805:"$boundary_ref"
+          boundary_sha="$(git rev-parse "$boundary_ref")"
+          parent_sha="$(git rev-parse "$GITHUB_SHA^")"
+          test "$parent_sha" = "$boundary_sha"
+
+          expected="UNLOCK_SPANISH_OUTCOMES_ONCE discovery=41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f boundary=$boundary_sha"
           test -f "$unlock"
-          test "$(cat "$unlock")" = "$expected"
+          printf '%s\n' "$expected" | cmp -s - "$unlock"
+
           mapfile -t changed < <(
-            git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA"
+            git diff-tree --no-commit-id --name-status -r "$GITHUB_SHA"
           )
           test "${#changed[@]}" -eq 1
-          test "${changed[0]}" = "$unlock"
+          test "${changed[0]}" =           python -m py_compile \
+            transient-globaldkd/validate_spain_locked.py \
+            transient-globaldkd/discover_windows.py
+
+          test "$(git hash-object transient-globaldkd/validate_spain_locked.py)" = \
+            "aa7ff8c5b0565e703573928e558b423fedb84491"
+          test "$(git hash-object transient-globaldkd/discover_windows.py)" = \
+            "a8f820e21aa51fcbfd2ed0b4e9144e8a51239d74"
+          test "$(sha256sum transient-globaldkd/discover_windows.py | cut -d' ' -f1)" = \
+            "f86232f2c94cf82a4d3b4dd8ae357a13fbf6edf22db2a27bf9b1b527d2eb1fa3"
+          test "$(git hash-object transient-globaldkd/PREREGISTRATION.md)" = \
+            "77391453057c193e4d6d62e5918b002fd36aefae"
+          test "$(sha256sum transient-globaldkd/PREREGISTRATION.md | cut -d' ' -f1)" = \
+            "200dde3ff02feac834f6b6b804d33af62226965576cd4acf30388225d0718b68"
+          test "$(git hash-object transient-globaldkd/frozen-discovery/frozen-discovery.json)" = \
+            "9e87e7a71a848656cac9df0263cde133ed3524ea"
+          test "$(sha256sum transient-globaldkd/frozen-discovery/frozen-discovery.json | cut -d' ' -f1)" = \
+            "41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f"
+          (
+            cd transient-globaldkd/frozen-discovery
+            sha256sum --check --strict frozen-discovery.sha256
+            sha256sum --check --strict fold-manifest.sha256
+          )
+          grep -Fq \
+            'k computational source-spectrum windows create 2k digital features' \
+            transient-globaldkd/ARTIFACT_ERRATUM.md
+          grep -Fq \
+            '41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f' \
+            transient-globaldkd/ARTIFACT_ERRATUM.md
+          test ! -e transient-globaldkd/outputs/spanish-validation
+
+      - name: Install pinned validation dependencies
+        run: |
+          python -m pip install --disable-pip-version-check \
+            -r transient-globaldkd/requirements-discovery.txt
+
+      - name: Download and verify versioned public archive
+        run: |
+          mkdir -p transient-globaldkd/data
+          curl --fail --location \
+            --retry 10 --retry-all-errors --retry-delay 15 \
+            'https://zenodo.org/records/14762603/files/GlobalDKD.zip?download=1' \
+            --output transient-globaldkd/data/GlobalDKD.zip
+          echo '8d5d4ba0e0578d0e39e76e1f1514a841  transient-globaldkd/data/GlobalDKD.zip' \
+            | md5sum --check --strict
+
+      - name: Execute locked ESP-only validator exactly once
+        run: |
+          python transient-globaldkd/validate_spain_locked.py \
+            transient-globaldkd/data/GlobalDKD.zip \
+            transient-globaldkd/frozen-discovery/frozen-discovery.json \
+            transient-globaldkd/frozen-discovery/frozen-discovery.sha256 \
+            transient-globaldkd/outputs/spanish-validation \
+            --reviewed-discovery-sha256 \
+            41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f \
+            --unlock-spanish-confirmation
+
+      - name: Print frozen validation summary and digest
+        if: always()
+        run: |
+          if [ -f transient-globaldkd/outputs/spanish-validation/validation-summary.json ]; then
+            cat transient-globaldkd/outputs/spanish-validation/validation-summary.json
+          fi
+          if [ -f transient-globaldkd/outputs/spanish-validation/frozen-validation.sha256 ]; then
+            cat transient-globaldkd/outputs/spanish-validation/frozen-validation.sha256
+          fi
+
+      - name: Always upload one-shot validation outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: globaldkd-spanish-validation-one-shot
+          path: transient-globaldkd/outputs/spanish-validation/
+          if-no-files-found: warn
+          retention-days: 7
+A\ttransient-globaldkd/VALIDATION_UNLOCK'
+          mapfile -t added_unlock < <(
+            git diff-tree --no-commit-id --diff-filter=A --name-status \
+              -r "$GITHUB_SHA" -- "$unlock"
+          )
+          test "${#added_unlock[@]}" -eq 1
+          test "${added_unlock[0]}" = \
+                      python -m py_compile \
+            transient-globaldkd/validate_spain_locked.py \
+            transient-globaldkd/discover_windows.py
+
+          test "$(git hash-object transient-globaldkd/validate_spain_locked.py)" = \
+            "aa7ff8c5b0565e703573928e558b423fedb84491"
+          test "$(git hash-object transient-globaldkd/discover_windows.py)" = \
+            "a8f820e21aa51fcbfd2ed0b4e9144e8a51239d74"
+          test "$(sha256sum transient-globaldkd/discover_windows.py | cut -d' ' -f1)" = \
+            "f86232f2c94cf82a4d3b4dd8ae357a13fbf6edf22db2a27bf9b1b527d2eb1fa3"
+          test "$(git hash-object transient-globaldkd/PREREGISTRATION.md)" = \
+            "77391453057c193e4d6d62e5918b002fd36aefae"
+          test "$(sha256sum transient-globaldkd/PREREGISTRATION.md | cut -d' ' -f1)" = \
+            "200dde3ff02feac834f6b6b804d33af62226965576cd4acf30388225d0718b68"
+          test "$(git hash-object transient-globaldkd/frozen-discovery/frozen-discovery.json)" = \
+            "9e87e7a71a848656cac9df0263cde133ed3524ea"
+          test "$(sha256sum transient-globaldkd/frozen-discovery/frozen-discovery.json | cut -d' ' -f1)" = \
+            "41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f"
+          (
+            cd transient-globaldkd/frozen-discovery
+            sha256sum --check --strict frozen-discovery.sha256
+            sha256sum --check --strict fold-manifest.sha256
+          )
+          grep -Fq \
+            'k computational source-spectrum windows create 2k digital features' \
+            transient-globaldkd/ARTIFACT_ERRATUM.md
+          grep -Fq \
+            '41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f' \
+            transient-globaldkd/ARTIFACT_ERRATUM.md
+          test ! -e transient-globaldkd/outputs/spanish-validation
+
+      - name: Install pinned validation dependencies
+        run: |
+          python -m pip install --disable-pip-version-check \
+            -r transient-globaldkd/requirements-discovery.txt
+
+      - name: Download and verify versioned public archive
+        run: |
+          mkdir -p transient-globaldkd/data
+          curl --fail --location \
+            --retry 10 --retry-all-errors --retry-delay 15 \
+            'https://zenodo.org/records/14762603/files/GlobalDKD.zip?download=1' \
+            --output transient-globaldkd/data/GlobalDKD.zip
+          echo '8d5d4ba0e0578d0e39e76e1f1514a841  transient-globaldkd/data/GlobalDKD.zip' \
+            | md5sum --check --strict
+
+      - name: Execute locked ESP-only validator exactly once
+        run: |
+          python transient-globaldkd/validate_spain_locked.py \
+            transient-globaldkd/data/GlobalDKD.zip \
+            transient-globaldkd/frozen-discovery/frozen-discovery.json \
+            transient-globaldkd/frozen-discovery/frozen-discovery.sha256 \
+            transient-globaldkd/outputs/spanish-validation \
+            --reviewed-discovery-sha256 \
+            41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f \
+            --unlock-spanish-confirmation
+
+      - name: Print frozen validation summary and digest
+        if: always()
+        run: |
+          if [ -f transient-globaldkd/outputs/spanish-validation/validation-summary.json ]; then
+            cat transient-globaldkd/outputs/spanish-validation/validation-summary.json
+          fi
+          if [ -f transient-globaldkd/outputs/spanish-validation/frozen-validation.sha256 ]; then
+            cat transient-globaldkd/outputs/spanish-validation/frozen-validation.sha256
+          fi
+
+      - name: Always upload one-shot validation outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: globaldkd-spanish-validation-one-shot
+          path: transient-globaldkd/outputs/spanish-validation/
+          if-no-files-found: warn
+          retention-days: 7
+A\ttransient-globaldkd/VALIDATION_UNLOCK'
+          test "$(git rev-list --all -- "$unlock" | wc -l)" -eq 1
 
           python -m py_compile \
             transient-globaldkd/validate_spain_locked.py \
