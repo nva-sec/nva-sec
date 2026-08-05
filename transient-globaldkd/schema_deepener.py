@@ -28,35 +28,84 @@ MAX_NODES = 10000
 MAX_OBJECT_ELEMENTS = 32
 
 
-def extract_mlx_code(payload: bytes) -> str:
-    """Return source nodes from a MATLAB live script, excluding output.xml."""
+def _redact_probe_numeric_text(text: str) -> str:
+    """Redact numeric literals in XML diagnostics; source blocks remain exact."""
+    return re.sub(
+        r"(?<![A-Za-z_])[-+]?\\d+(?:\\.\\d+)?(?:[eE][-+]?\\d+)?",
+        "<NUM>",
+        text,
+    )
+
+
+def extract_mlx_code(payload: bytes, include_probe: bool = False) -> tuple[str, str]:
+    """Extract code-tag text from every MLX XML member and optionally diagnose tags."""
     with zipfile.ZipFile(io.BytesIO(payload)) as live:
-        xml_members = [
-            name for name in live.namelist()
-            if name.lower().endswith("document.xml")
-        ]
-        blocks = []
-        for member in xml_members:
+        blocks: list[str] = []
+        seen: set[str] = set()
+        histograms: dict[str, dict[str, int]] = {}
+        probes: list[str] = []
+
+        for member in sorted(
+            name for name in live.namelist() if name.lower().endswith(".xml")
+        ):
+            xml_bytes = live.read(member)
             try:
-                root = ElementTree.fromstring(live.read(member))
+                root = ElementTree.fromstring(xml_bytes)
             except ElementTree.ParseError:
                 continue
-            preferred = []
-            fallback = []
+
+            tags = Counter(
+                node.tag.rsplit("}", 1)[-1].lower()
+                for node in root.iter()
+            )
+            histograms[member] = dict(sorted(tags.items()))
+
+            if include_probe and member.lower().endswith("document.xml"):
+                raw = xml_bytes.decode("utf-8", errors="replace")
+                itertext = "\\n".join(
+                    text.strip() for text in root.itertext() if text.strip()
+                )
+                probes.extend(
+                    [
+                        f"===== XML PROBE: {member} TAG HISTOGRAM =====",
+                        json.dumps(histograms[member], indent=2, sort_keys=True),
+                        f"===== XML PROBE: {member} RAW FIRST 20000 CHARS; NUMBERS REDACTED =====",
+                        _redact_probe_numeric_text(raw[:20000]),
+                        f"===== XML PROBE: {member} ITERTEXT FIRST 20000 CHARS; NUMBERS REDACTED =====",
+                        _redact_probe_numeric_text(itertext[:20000]),
+                    ]
+                )
+
             for node in root.iter():
                 tag = node.tag.rsplit("}", 1)[-1].lower()
-                text = "".join(node.itertext()).strip()
-                if not text:
+                if tag not in {"mcode", "code", "input"}:
                     continue
-                if tag == "mcode":
-                    preferred.append(text)
-                elif tag in {"code", "input"}:
-                    fallback.append(text)
-            candidates = preferred or fallback
-            for text in candidates:
-                if not blocks or blocks[-1] != text:
-                    blocks.append(text)
-        return "\n\n% ---- live-script code block ----\n\n".join(blocks)
+                source = "".join(node.itertext()).strip()
+                if not source or source in seen:
+                    continue
+                seen.add(source)
+                blocks.append(
+                    f"% ---- MLX source: {member}; tag={tag} ----\\n{source}"
+                )
+
+        if include_probe:
+            probes.extend(
+                [
+                    "===== ALL XML TAG HISTOGRAMS =====",
+                    json.dumps(histograms, indent=2, sort_keys=True),
+                    "===== EXTRACTED SOURCE INVENTORY =====",
+                    json.dumps(
+                        {
+                            "block_count": len(blocks),
+                            "character_count": sum(len(item) for item in blocks),
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    ),
+                ]
+            )
+
+        return "\\n\\n".join(blocks), "\\n".join(probes)
 
 
 def append_record(records: list[dict], record: dict) -> bool:
@@ -248,6 +297,31 @@ def symbol_context(code: str, source: str) -> list[str]:
     return result
 
 
+
+HIGH_SIGNAL_ROOTS = {
+    "AUS_Int", "ESP", "Global", "All", "AlbConcALL", "ProCon", "wnm"
+}
+
+
+def compact_records(item: dict) -> dict:
+    """Keep only requested top-level PLS objects at bounded path depth."""
+    kept = []
+    for record in item["records"]:
+        path = str(record.get("path", ""))
+        root = re.split(r"[.[]", path, maxsplit=1)[0]
+        path_depth = path.count(".") + path.count("[")
+        is_opaque = "opaque" in str(record.get("type", "")).lower()
+        if (root in HIGH_SIGNAL_ROOTS and path_depth <= 4) or is_opaque:
+            kept.append(record)
+    return {
+        "path": item["path"],
+        "load_mode": item["load_mode"],
+        "original_record_count": item["record_count"],
+        "record_count": len(kept),
+        "truncated": item["truncated"],
+        "records": kept,
+    }
+
 def main() -> None:
     archive = Path(sys.argv[1] if len(sys.argv) > 1 else "data/GlobalDKD.zip")
     output_dir = Path(sys.argv[2] if len(sys.argv) > 2 else "outputs/schema-audit")
@@ -267,28 +341,34 @@ def main() -> None:
         dataset_mlx = "Zenodo/DATASET.mlx"
         if dataset_mlx not in names:
             raise SystemExit("missing Zenodo/DATASET.mlx")
-        dataset_code = extract_mlx_code(bundle.read(dataset_mlx))
+        dataset_code, dataset_probe = extract_mlx_code(
+            bundle.read(dataset_mlx), include_probe=True
+        )
 
         contexts = []
         for name in sorted(
             item for item in names
             if item.lower().endswith(".mlx") and item != dataset_mlx
         ):
-            code = extract_mlx_code(bundle.read(name))
+            code, _ = extract_mlx_code(bundle.read(name))
             contexts.extend(symbol_context(code, name))
 
+    compact_deep = [compact_records(item) for item in deep]
     (output_dir / "deep-mat-schema.json").write_text(
         json.dumps(
             {
-                "phase": "schema deepener; numeric values redacted",
-                "mat_files": deep,
+                "phase": "compact schema deepener; numeric values redacted",
+                "mat_files": compact_deep,
             },
             indent=2,
             sort_keys=True,
         ),
         encoding="utf-8",
     )
-    (output_dir / "DATASET.complete-code.txt").write_text(dataset_code + "\n", encoding="utf-8")
+    (output_dir / "DATASET.complete-code.txt").write_text(
+        dataset_code + "\n\n" + dataset_probe + "\n",
+        encoding="utf-8",
+    )
     (output_dir / "mlx-symbol-context.txt").write_text("\n".join(contexts) + "\n", encoding="utf-8")
 
     print(
