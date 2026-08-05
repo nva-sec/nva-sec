@@ -280,7 +280,7 @@ def spanish_roc(validation: dict, path: Path) -> None:
     ax.set(xlim=(0, 1), ylim=(0, 1))
     ax.set_xlabel("1 − specificity")
     ax.set_ylabel("Sensitivity")
-    ax.set_title("One-shot Spanish archived-cohort reuse")
+    ax.set_title("Spanish archived-cohort reuse — technical retry 1")
     ax.legend(frameon=False, loc="lower right")
     save(fig, path)
 
@@ -358,6 +358,12 @@ def make_report(
     comparator = discovery["discovery"]["all_window_comparator"]
     nested = discovery["nested_selection_audit"]
     duplicates = discovery["data_integrity"]["duplicate_audit"]
+    qualifying_by_k = [
+        discovery["discovery"]["qualifying_by_size"][str(k)]
+        for k in range(1, 5)
+    ]
+    if qualifying_by_k != [0, 15, 282, 2678]:
+        raise RuntimeError("unexpected artifact-sourced qualifying counts by k")
     lines = [
         f"# {TITLE}",
         "",
@@ -415,6 +421,9 @@ def make_report(
         ]
     lines += [
         f"- Qualifying candidates: {discovery['discovery']['qualifying_count']}.",
+        "- Artifact-sourced qualifying counts by k=1/2/3/4: "
+        + "/".join(str(value) for value in qualifying_by_k)
+        + " (0/15/282/2678).",
         f"- 24-window repeated-CV AUROC: {fmt(comparator['auroc'])}.",
         f"- Nested folds yielding a design: "
         f"{nested['outer_folds_with_design']}/{nested['outer_fold_count']}.",
