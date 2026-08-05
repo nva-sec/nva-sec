@@ -1,0 +1,149 @@
+name: Promote exact frozen GlobalDKD discovery
+
+on:
+  push:
+    branches:
+      - transient/globaldkd-schema-20260805
+    paths:
+      - '.github/workflows/promote-globaldkd-discovery.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: promote-globaldkd-discovery
+  cancel-in-progress: false
+
+jobs:
+  promote-frozen-files:
+    if: >-
+      github.repository == 'nva-sec/nva-sec' &&
+      github.ref == 'refs/heads/transient/globaldkd-schema-20260805'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: transient/globaldkd-schema-20260805
+          fetch-depth: 1
+
+      - name: Verify exact successful source run and artifact metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_json="$(gh run view 31005831329 --repo "$GITHUB_REPOSITORY" \
+            --json databaseId,headSha,conclusion,event)"
+          test "$(jq -r .databaseId <<<"$run_json")" = "31005831329"
+          test "$(jq -r .headSha <<<"$run_json")" = \
+            "b012a183484f6525eb52ba4eb4ba40090feda845"
+          test "$(jq -r .conclusion <<<"$run_json")" = "success"
+
+          artifact_json="$(gh api \
+            "/repos/$GITHUB_REPOSITORY/actions/artifacts/8930796749")"
+          test "$(jq -r .id <<<"$artifact_json")" = "8930796749"
+          test "$(jq -r .name <<<"$artifact_json")" = \
+            "globaldkd-australian-discovery"
+          test "$(jq -r .workflow_run.id <<<"$artifact_json")" = "31005831329"
+          test "$(jq -r .digest <<<"$artifact_json")" = \
+            "sha256:e31aa988444ee07942ade34fbb12c0fc8babdf60016b65402f4447d3abfca99d"
+
+      - name: Download by run and verify against exact artifact ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/by-run" "$RUNNER_TEMP/by-id"
+          gh run download 31005831329 --repo "$GITHUB_REPOSITORY" \
+            --name globaldkd-australian-discovery \
+            --dir "$RUNNER_TEMP/by-run"
+          gh api \
+            "/repos/$GITHUB_REPOSITORY/actions/artifacts/8930796749/zip" \
+            > "$RUNNER_TEMP/globaldkd-australian-discovery.zip"
+          echo "e31aa988444ee07942ade34fbb12c0fc8babdf60016b65402f4447d3abfca99d  $RUNNER_TEMP/globaldkd-australian-discovery.zip" \
+            | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/globaldkd-australian-discovery.zip" \
+            -d "$RUNNER_TEMP/by-id"
+          diff -qr "$RUNNER_TEMP/by-run" "$RUNNER_TEMP/by-id"
+
+      - name: Verify exact five files, sidecars, and canonical discovery
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/by-id"
+          find . -mindepth 1 -maxdepth 1 -type f -printf '%f\n' | sort \
+            > "$RUNNER_TEMP/observed-files.txt"
+          cat > "$RUNNER_TEMP/expected-files.txt" <<'EOF'
+          discovery-summary.json
+          fold-manifest.json
+          fold-manifest.sha256
+          frozen-discovery.json
+          frozen-discovery.sha256
+          EOF
+          diff -u "$RUNNER_TEMP/expected-files.txt" \
+            "$RUNNER_TEMP/observed-files.txt"
+          test "$(find . -mindepth 1 -maxdepth 1 -type f | wc -l)" -eq 5
+          test -z "$(find . -mindepth 1 -maxdepth 1 ! -type f -print -quit)"
+          sha256sum --check --strict frozen-discovery.sha256
+          sha256sum --check --strict fold-manifest.sha256
+          test "$(sha256sum frozen-discovery.json | cut -d' ' -f1)" = \
+            "41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f"
+          test "$(sha256sum fold-manifest.json | cut -d' ' -f1)" = \
+            "6ccd3b6fdbeeadb2fa8d8808480f09e9a9eb0fc3d3631cd0f2540121b8011de3"
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path(".")
+          payload = (root / "frozen-discovery.json").read_bytes()
+          value = json.loads(payload)
+          canonical = json.dumps(
+              value,
+              sort_keys=True,
+              separators=(",", ":"),
+              ensure_ascii=False,
+              allow_nan=False,
+          ).encode("utf-8")
+          assert payload == canonical
+          assert hashlib.sha256(payload).hexdigest() == (
+              "41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f"
+          )
+          script = Path(
+              "$GITHUB_WORKSPACE/transient-globaldkd/discover_windows.py"
+          ).read_bytes()
+          prereg = Path(
+              "$GITHUB_WORKSPACE/transient-globaldkd/PREREGISTRATION.md"
+          ).read_bytes()
+          assert hashlib.sha256(script).hexdigest() == value["input"]["code_sha256"]
+          assert hashlib.sha256(prereg).hexdigest() == (
+              value["input"]["preregistration_sha256"]
+          )
+          assert value["input"]["archive_members_read"] == [
+              "Zenodo/dataset.mat"
+          ]
+          assert value["input"]["mat_variables_requested"] == ["AUS_Int"]
+          assert value["input"]["spanish_outcomes_read"] is False
+          assert value["status"] == "DESIGN"
+          PY
+          sha256sum discovery-summary.json fold-manifest.json \
+            fold-manifest.sha256 frozen-discovery.json \
+            frozen-discovery.sha256
+
+      - name: Commit exact frozen files to transient branch
+        run: |
+          set -euo pipefail
+          destination="transient-globaldkd/frozen-discovery"
+          mkdir -p "$destination"
+          cp "$RUNNER_TEMP/by-id/discovery-summary.json" "$destination/"
+          cp "$RUNNER_TEMP/by-id/fold-manifest.json" "$destination/"
+          cp "$RUNNER_TEMP/by-id/fold-manifest.sha256" "$destination/"
+          cp "$RUNNER_TEMP/by-id/frozen-discovery.json" "$destination/"
+          cp "$RUNNER_TEMP/by-id/frozen-discovery.sha256" "$destination/"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$destination"
+          test -n "$(git diff --cached --name-only)"
+          git commit -m "[skip ci] Promote exact frozen discovery from run 31005831329"
+          git push origin HEAD:transient/globaldkd-schema-20260805
+          git rev-parse HEAD
