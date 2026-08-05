@@ -1,0 +1,226 @@
+name: Promote corrected frozen GlobalDKD report
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/promote-globaldkd-report.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: promote-corrected-globaldkd-report
+  cancel-in-progress: false
+
+jobs:
+  promote-frozen-report:
+    if: >-
+      github.repository == 'nva-sec/nva-sec' &&
+      github.event.pull_request.head.ref == 'transient/globaldkd-schema-20260805'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: transient/globaldkd-schema-20260805
+          fetch-depth: 0
+
+      - name: Verify exact corrected renderer run, job, and artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_json="$(gh run view 31012522238 --repo "$GITHUB_REPOSITORY" \
+            --json databaseId,headSha,headBranch,conclusion,event)"
+          test "$(jq -r .databaseId <<<"$run_json")" = "31012522238"
+          test "$(jq -r .headSha <<<"$run_json")" = \
+            "60a6f1328637a8343ed551ad0e573750547b4590"
+          test "$(jq -r .headBranch <<<"$run_json")" = \
+            "transient/globaldkd-schema-20260805"
+          test "$(jq -r .conclusion <<<"$run_json")" = "success"
+          test "$(jq -r .event <<<"$run_json")" = "pull_request"
+
+          jobs_json="$(gh api \
+            "/repos/$GITHUB_REPOSITORY/actions/runs/31012522238/jobs")"
+          test "$(jq '[.jobs[] | select(.id == 92328092714 and .name == "render-frozen-report" and .conclusion == "success")] | length' <<<"$jobs_json")" = "1"
+
+          artifact_json="$(gh api \
+            "/repos/$GITHUB_REPOSITORY/actions/artifacts/8933063173")"
+          test "$(jq -r .id <<<"$artifact_json")" = "8933063173"
+          test "$(jq -r .name <<<"$artifact_json")" = \
+            "globaldkd-frozen-report-technical-retry1"
+          test "$(jq -r .workflow_run.id <<<"$artifact_json")" = "31012522238"
+          test "$(jq -r .workflow_run.head_sha <<<"$artifact_json")" = \
+            "60a6f1328637a8343ed551ad0e573750547b4590"
+          test "$(jq -r .digest <<<"$artifact_json")" = \
+            "sha256:69db2eb896af631f94d0a45ecab1fbcc4fbfb683e091573ff2519a70328ff8f3"
+
+      - name: Download by run and verify exact corrected artifact ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/by-run" "$RUNNER_TEMP/by-id"
+          gh run download 31012522238 --repo "$GITHUB_REPOSITORY" \
+            --name globaldkd-frozen-report-technical-retry1 \
+            --dir "$RUNNER_TEMP/by-run"
+          gh api \
+            "/repos/$GITHUB_REPOSITORY/actions/artifacts/8933063173/zip" \
+            > "$RUNNER_TEMP/globaldkd-frozen-report.zip"
+          echo "69db2eb896af631f94d0a45ecab1fbcc4fbfb683e091573ff2519a70328ff8f3  $RUNNER_TEMP/globaldkd-frozen-report.zip" \
+            | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/globaldkd-frozen-report.zip" \
+            -d "$RUNNER_TEMP/by-id"
+          diff -qr "$RUNNER_TEMP/by-run" "$RUNNER_TEMP/by-id"
+
+      - name: Verify exact inventory, file hashes, provenance, and wording
+        env:
+          SOURCE_DIR: ${{ runner.temp }}/by-id
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_DIR"
+          find . -type f -printf '%P\n' | sort > "$RUNNER_TEMP/observed.txt"
+          cat > "$RUNNER_TEMP/expected.txt" <<'EOF'
+          figures/analysis-timeline.svg
+          figures/computational-window-library.svg
+          figures/discovery-performance.svg
+          figures/exact-search-landscape.svg
+          figures/held-out-spanish-roc.svg
+          figures/robustness-and-controls.svg
+          figures/unlabeled-control-plausibility.svg
+          report-manifest.json
+          report.md
+          EOF
+          diff -u "$RUNNER_TEMP/expected.txt" "$RUNNER_TEMP/observed.txt"
+          test "$(find . -type f | wc -l)" -eq 9
+          test "$(find . -type d | wc -l)" -eq 2
+          cat > "$RUNNER_TEMP/expected-sha256.txt" <<'EOF'
+          b1ee432ce08e4a63faadc2a94f0d4cc0dcb4fbe22f92892084c6c8a4fbb1593f  figures/analysis-timeline.svg
+          d33ae2d7c6eb35558fa61bc8c50c0f67fd1f1078cfc8f13643271e139bb1539f  figures/computational-window-library.svg
+          a1eb9df38fcc8bbc27f02348ccf54ecc7f69de76f857342646d82d0130c36bff  figures/discovery-performance.svg
+          b4c7ed9fd325abea37fe99992dda1c8f40357d0dccaa09551edbe55d0fb2dab6  figures/exact-search-landscape.svg
+          b2d77d561844d275a79328746ff12ee19096d166954faa9d2871c9f87d06bb73  figures/held-out-spanish-roc.svg
+          3193110e8d1ba895f17b8aead28eb9b3b29374d321175f706abfed4c4d0b1cd7  figures/robustness-and-controls.svg
+          c760d0bfbe1cb9d62782d47160a647c31e70085c70962c89886990a903224fb7  figures/unlabeled-control-plausibility.svg
+          7d34462e640ebc5742dd092d2bfd3cc3996fc34def64d74dcede7320fc540daa  report-manifest.json
+          47ca7901f3e0b1a1d5c77fe5f414e342dc32b83276edf11abf006aa7c696732b  report.md
+          EOF
+          sha256sum --check --strict "$RUNNER_TEMP/expected-sha256.txt"
+
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          source = Path(os.environ["SOURCE_DIR"])
+          raw_manifest = (source / "report-manifest.json").read_bytes()
+          manifest = json.loads(raw_manifest)
+          expected_manifest = (
+              json.dumps(
+                  manifest,
+                  indent=2,
+                  sort_keys=True,
+                  allow_nan=False,
+              )
+              + "\n"
+          ).encode("utf-8")
+          assert raw_manifest == expected_manifest
+          assert manifest["schema_version"] == "globaldkd-report-manifest-v1"
+          assert manifest["scope"] == (
+              "read-only rendering; no archive access, fitting, selection, "
+              "threshold changes, control labels, or hardware simulation"
+          )
+          assert manifest["inputs"] == {
+              "attempt_1_failure_note_sha256":
+                  "d84eab971456f7ecc6418b1aa41b3a33f819d27a354d7daadcf78ab55c17100e",
+              "discovery_sha256":
+                  "41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f",
+              "validation_sha256":
+                  "fb1111b4e0539f854c60bbb11c6211632d3162cb5ccb1505736bed9085a33da4",
+          }
+          assert manifest["execution"] == {
+              "attempt_1_job": "92317956542",
+              "attempt_1_run": "31009572812",
+              "spanish_phase": "schema-only technical retry 1",
+              "technical_retry_artifact": "8932293583",
+              "technical_retry_job": "92321693370",
+              "technical_retry_run": "31010663111",
+          }
+          expected_outputs = {
+              "figures/analysis-timeline.svg":
+                  "b1ee432ce08e4a63faadc2a94f0d4cc0dcb4fbe22f92892084c6c8a4fbb1593f",
+              "figures/computational-window-library.svg":
+                  "d33ae2d7c6eb35558fa61bc8c50c0f67fd1f1078cfc8f13643271e139bb1539f",
+              "figures/discovery-performance.svg":
+                  "a1eb9df38fcc8bbc27f02348ccf54ecc7f69de76f857342646d82d0130c36bff",
+              "figures/exact-search-landscape.svg":
+                  "b4c7ed9fd325abea37fe99992dda1c8f40357d0dccaa09551edbe55d0fb2dab6",
+              "figures/held-out-spanish-roc.svg":
+                  "b2d77d561844d275a79328746ff12ee19096d166954faa9d2871c9f87d06bb73",
+              "figures/robustness-and-controls.svg":
+                  "3193110e8d1ba895f17b8aead28eb9b3b29374d321175f706abfed4c4d0b1cd7",
+              "figures/unlabeled-control-plausibility.svg":
+                  "c760d0bfbe1cb9d62782d47160a647c31e70085c70962c89886990a903224fb7",
+              "report.md":
+                  "47ca7901f3e0b1a1d5c77fe5f414e342dc32b83276edf11abf006aa7c696732b",
+          }
+          assert manifest["outputs"] == expected_outputs
+
+          report_raw = (source / "report.md").read_bytes()
+          assert report_raw.endswith(b"\n")
+          report = report_raw.decode("utf-8")
+          assert "schema-only technical retry 1" in report
+          assert (
+              "Artifact-sourced qualifying counts by k=1/2/3/4: "
+              "0/15/282/2678."
+          ) in report
+          assert "0/15/282/2678 (" not in report
+          assert "sharing the 3328 cm⁻¹ boundary" in report
+          assert "one false positive, versus four" in report
+          assert "Operating-point warning" in report
+          assert "Both Spanish negative controls showed" in report
+          assert hashlib.sha256(report_raw).hexdigest() == \
+              "47ca7901f3e0b1a1d5c77fe5f414e342dc32b83276edf11abf006aa7c696732b"
+          PY
+
+      - name: Verify frozen renderer and disclosure sources
+        run: |
+          set -euo pipefail
+          test "$(git hash-object transient-globaldkd/generate_report.py)" = \
+            "0220cb69b12c730b5a8a61091ee479818eea9c48"
+          test "$(git hash-object transient-globaldkd/ATTEMPT_1_FAILURE.md)" = \
+            "8eda3f95ee87fb05c46f30e766bab39f62c9bd90"
+          test "$(git hash-object transient-globaldkd/frozen-discovery/frozen-discovery.json)" = \
+            "9e87e7a71a848656cac9df0263cde133ed3524ea"
+          test "$(git hash-object transient-globaldkd/frozen-validation/frozen-validation.json)" = \
+            "615d7fdd31964a398768e8c8b19a08c87beaf73e"
+
+      - name: Promote exact corrected report files
+        env:
+          SOURCE_DIR: ${{ runner.temp }}/by-id
+        run: |
+          set -euo pipefail
+          destination='transient-globaldkd/frozen-report'
+          test ! -e "$destination"
+          cp -R "$SOURCE_DIR" "$destination"
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add "$destination"
+          test "$(git diff --cached --name-only | wc -l)" -eq 9
+          git commit -m "Promote exact corrected frozen GlobalDKD report [skip ci]"
+          git push origin HEAD:transient/globaldkd-schema-20260805
+          echo "promoted_commit=$(git rev-parse HEAD)"
+
+      - name: Print promoted Git blobs and SHA-256
+        run: |
+          find transient-globaldkd/frozen-report -type f -print0 \
+            | sort -z | while IFS= read -r -d '' path; do
+                printf '%s  %s  %s\n' \
+                  "$(git hash-object "$path")" \
+                  "$(sha256sum "$path" | cut -d' ' -f1)" \
+                  "$path"
+              done
