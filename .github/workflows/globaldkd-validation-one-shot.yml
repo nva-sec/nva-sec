@@ -54,11 +54,23 @@ jobs:
           test -f "$unlock"
           printf '%s\n' "$expected" | cmp -s - "$unlock"
 
-          mapfile -t changed < <(
-            git diff-tree --no-commit-id --name-status -r "$GITHUB_SHA"
-          )
-          test "${#changed[@]}" -eq 1
-          test "${changed[0]}" =           python -m py_compile \
+          git diff-tree --no-commit-id --name-status -r "$GITHUB_SHA" \
+            > "$RUNNER_TEMP/observed-status.txt"
+          printf 'A\\t%s\\n' "$unlock" \
+            > "$RUNNER_TEMP/expected-status.txt"
+          cmp -s "$RUNNER_TEMP/expected-status.txt" \
+            "$RUNNER_TEMP/observed-status.txt"
+
+          git diff-tree --no-commit-id --diff-filter=A --name-status \
+            -r "$GITHUB_SHA" -- "$unlock" \
+            > "$RUNNER_TEMP/observed-added-unlock.txt"
+          cmp -s "$RUNNER_TEMP/expected-status.txt" \
+            "$RUNNER_TEMP/observed-added-unlock.txt"
+          test -z "$(git ls-tree -r --name-only "$boundary_sha" -- "$unlock")"
+          history_count="$(git rev-list --all -- "$unlock" | wc -l | tr -d ' ')"
+          test "$history_count" = "1"
+
+          python -m py_compile \
             transient-globaldkd/validate_spain_locked.py \
             transient-globaldkd/discover_windows.py
 
