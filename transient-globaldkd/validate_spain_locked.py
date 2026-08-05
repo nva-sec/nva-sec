@@ -53,7 +53,7 @@ ROBUST_WIDTHS = (48.0, 80.0)
 REQUESTED_VARIABLES = ("ESP",)
 FORBIDDEN_VARIABLES = ("AUS_Int", "Global")
 # Fail closed until the reviewed discovery artifact is committed.
-REVIEWED_DISCOVERY_SHA256: str | None = (\n    "41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f"\n)
+REVIEWED_DISCOVERY_SHA256: str | None = "41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f"
 
 
 def load_and_verify_discovery(
