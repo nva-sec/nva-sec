@@ -1,7 +1,11 @@
 name: Render frozen GlobalDKD report after technical retry 1
 
 on:
-  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/globaldkd-report-frozen.yml'
 
 permissions:
   contents: read
@@ -31,7 +35,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git hash-object transient-globaldkd/generate_report.py)" = \
-            "66773d402db117df5035d2231d21773ec4ae993b"
+            "0220cb69b12c730b5a8a61091ee479818eea9c48"
           test "$(git hash-object transient-globaldkd/requirements-report.txt)" = \
             "bf34996dd3eeaab44d37ad41a1247ecd91c1020f"
           test "$(git hash-object transient-globaldkd/ATTEMPT_1_FAILURE.md)" = \
