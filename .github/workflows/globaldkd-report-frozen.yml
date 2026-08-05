@@ -1,0 +1,186 @@
+name: Render frozen GlobalDKD report after technical retry 1
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/globaldkd-report-frozen.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: globaldkd-frozen-report-technical-retry1
+  cancel-in-progress: false
+
+jobs:
+  render-frozen-report:
+    if: >-
+      github.repository == 'nva-sec/nva-sec' &&
+      github.event.pull_request.head.ref == 'transient/globaldkd-schema-20260805'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: transient/globaldkd-schema-20260805
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Fail-closed frozen-input and renderer preflight
+        run: |
+          set -euo pipefail
+          test "$(git hash-object transient-globaldkd/generate_report.py)" = \
+            "66773d402db117df5035d2231d21773ec4ae993b"
+          test "$(git hash-object transient-globaldkd/requirements-report.txt)" = \
+            "bf34996dd3eeaab44d37ad41a1247ecd91c1020f"
+          test "$(git hash-object transient-globaldkd/ATTEMPT_1_FAILURE.md)" = \
+            "8eda3f95ee87fb05c46f30e766bab39f62c9bd90"
+          test "$(git hash-object transient-globaldkd/frozen-discovery/frozen-discovery.json)" = \
+            "9e87e7a71a848656cac9df0263cde133ed3524ea"
+          test "$(git hash-object transient-globaldkd/frozen-validation/frozen-validation.json)" = \
+            "615d7fdd31964a398768e8c8b19a08c87beaf73e"
+          test "$(git hash-object transient-globaldkd/frozen-validation/frozen-validation.sha256)" = \
+            "b9ce7a2215e00c70ea41eef37d352102147fe81d"
+          test "$(git hash-object transient-globaldkd/frozen-validation/validation-summary.json)" = \
+            "4dff09ceacf3ba17639984c97863086eb40b0955"
+
+          (
+            cd transient-globaldkd/frozen-discovery
+            sha256sum --check --strict frozen-discovery.sha256
+            sha256sum --check --strict fold-manifest.sha256
+          )
+          (
+            cd transient-globaldkd/frozen-validation
+            sha256sum --check --strict frozen-validation.sha256
+          )
+          test "$(sha256sum transient-globaldkd/frozen-discovery/frozen-discovery.json | cut -d' ' -f1)" = \
+            "41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f"
+          test "$(sha256sum transient-globaldkd/frozen-validation/frozen-validation.json | cut -d' ' -f1)" = \
+            "fb1111b4e0539f854c60bbb11c6211632d3162cb5ccb1505736bed9085a33da4"
+
+          python -m py_compile transient-globaldkd/generate_report.py
+          test ! -e transient-globaldkd/frozen-report
+          ! grep -Eq 'loadmat|zipfile|GlobalDKD\.zip|discover_windows|validate_spain_locked' \
+            transient-globaldkd/generate_report.py
+          grep -Fq 'schema-only technical retry 1' \
+            transient-globaldkd/generate_report.py
+          grep -Fq '0/15/282/2678' transient-globaldkd/generate_report.py
+          grep -Fq 'sharing the 3328 cm⁻¹ boundary' \
+            transient-globaldkd/generate_report.py
+          grep -Fq 'did not construct threshold classes' \
+            transient-globaldkd/ATTEMPT_1_FAILURE.md
+
+      - name: Install pinned rendering-only dependencies
+        run: |
+          python -m pip install --disable-pip-version-check \
+            -r transient-globaldkd/requirements-report.txt
+
+      - name: Render only from immutable JSON and disclosure note
+        run: |
+          python transient-globaldkd/generate_report.py \
+            transient-globaldkd/frozen-discovery/frozen-discovery.json \
+            transient-globaldkd/frozen-discovery/frozen-discovery.sha256 \
+            transient-globaldkd/frozen-report \
+            --validation \
+            transient-globaldkd/frozen-validation/frozen-validation.json \
+            --validation-sha256 \
+            transient-globaldkd/frozen-validation/frozen-validation.sha256 \
+            --attempt-1-note transient-globaldkd/ATTEMPT_1_FAILURE.md
+
+      - name: Verify report inventory, provenance, and claim-ceiling text
+        run: |
+          set -euo pipefail
+          test "$(find transient-globaldkd/frozen-report -type f | wc -l)" -eq 9
+          test "$(find transient-globaldkd/frozen-report/figures -type f -name '*.svg' | wc -l)" -eq 7
+          test -f transient-globaldkd/frozen-report/report.md
+          test -f transient-globaldkd/frozen-report/report-manifest.json
+          grep -Fq 'schema-only technical retry 1' \
+            transient-globaldkd/frozen-report/report.md
+          grep -Fq 'Failed attempt: run 31009572812, job 92317956542' \
+            transient-globaldkd/frozen-report/report.md
+          grep -Fq 'Successful technical retry: run 31010663111, job 92321693370, artifact 8932293583' \
+            transient-globaldkd/frozen-report/report.md
+          grep -Fq '0/15/282/2678' \
+            transient-globaldkd/frozen-report/report.md
+          grep -Fq 'sharing the 3328 cm⁻¹ boundary' \
+            transient-globaldkd/frozen-report/report.md
+          grep -Fq 'one false positive, versus four' \
+            transient-globaldkd/frozen-report/report.md
+          grep -Fq 'Operating-point warning' \
+            transient-globaldkd/frozen-report/report.md
+          grep -Fq 'Both Spanish negative controls showed' \
+            transient-globaldkd/frozen-report/report.md
+          grep -Fq '| common shift +16 cm inverse |' \
+            transient-globaldkd/frozen-report/report.md
+          grep -Fq '| common shift -16 cm inverse |' \
+            transient-globaldkd/frozen-report/report.md
+          grep -Fq '| width 48 cm inverse |' \
+            transient-globaldkd/frozen-report/report.md
+          grep -Fq '| width 80 cm inverse |' \
+            transient-globaldkd/frozen-report/report.md
+          grep -Fq '| atmospheric instrument artifact |' \
+            transient-globaldkd/frozen-report/report.md
+          grep -Fq '| clean off target |' \
+            transient-globaldkd/frozen-report/report.md
+
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path("transient-globaldkd")
+          manifest = json.loads(
+              (root / "frozen-report/report-manifest.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          assert manifest["schema_version"] == "globaldkd-report-manifest-v1"
+          assert manifest["inputs"]["discovery_sha256"] == \
+              "41460a6e8e21c6979f8ead43ee383a1691baab37897fb5c7ab29b66b636c531f"
+          assert manifest["inputs"]["validation_sha256"] == \
+              "fb1111b4e0539f854c60bbb11c6211632d3162cb5ccb1505736bed9085a33da4"
+          note = (root / "ATTEMPT_1_FAILURE.md").read_bytes()
+          assert manifest["inputs"]["attempt_1_failure_note_sha256"] == \
+              hashlib.sha256(note).hexdigest()
+          assert manifest["execution"] == {
+              "attempt_1_job": "92317956542",
+              "attempt_1_run": "31009572812",
+              "spanish_phase": "schema-only technical retry 1",
+              "technical_retry_artifact": "8932293583",
+              "technical_retry_job": "92321693370",
+              "technical_retry_run": "31010663111",
+          }
+          assert len(manifest["outputs"]) == 8
+          assert any(
+              "negative-control" in warning
+              for warning in manifest["warnings"]
+          )
+          PY
+
+      - name: Print frozen report and output digests
+        if: always()
+        run: |
+          if [ -f transient-globaldkd/frozen-report/report.md ]; then
+            cat transient-globaldkd/frozen-report/report.md
+          fi
+          if [ -f transient-globaldkd/frozen-report/report-manifest.json ]; then
+            cat transient-globaldkd/frozen-report/report-manifest.json
+          fi
+          if [ -d transient-globaldkd/frozen-report ]; then
+            find transient-globaldkd/frozen-report -type f -print0 \
+              | sort -z | xargs -0 sha256sum
+          fi
+
+      - name: Always upload frozen rendered report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: globaldkd-frozen-report-technical-retry1
+          path: transient-globaldkd/frozen-report/
+          if-no-files-found: warn
+          retention-days: 7
