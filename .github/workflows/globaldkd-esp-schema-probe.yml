@@ -1,0 +1,75 @@
+name: Redacted GlobalDKD ESP unused-slot schema probe
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned parser dependencies
+        run: python -m pip install --disable-pip-version-check numpy==2.0.2 scipy==1.13.1
+      - name: Download exact archive
+        run: |
+          curl --fail --location --retry 10 --retry-all-errors --retry-delay 15 \
+            'https://zenodo.org/records/14762603/files/GlobalDKD.zip?download=1' \
+            --output GlobalDKD.zip
+          echo '8d5d4ba0e0578d0e39e76e1f1514a841  GlobalDKD.zip' | md5sum --check --strict
+      - name: Probe only unused ESP schema slots
+        run: |
+          python - <<'PY'
+          import io
+          import json
+          import zipfile
+          import numpy as np
+          from scipy.io import loadmat
+
+          with zipfile.ZipFile('GlobalDKD.zip') as zf:
+              payload = zf.read('Zenodo/dataset.mat')
+          loaded = loadmat(io.BytesIO(payload), simplify_cells=True, variable_names=('ESP',))
+          esp = loaded['ESP']
+          axes = np.asarray(esp['axisscale'], dtype=object).reshape(-1)
+          labels = np.asarray(esp['label'], dtype=object).reshape(-1)
+
+          def describe(value):
+              arr = np.asarray(value)
+              record = {
+                  'python_type': type(value).__name__,
+                  'dtype': str(arr.dtype),
+                  'shape': list(arr.shape),
+                  'size': int(arr.size),
+              }
+              if arr.size <= 4 and arr.dtype.kind in {'U', 'S', 'O'}:
+                  record['string_repr'] = [str(item) for item in arr.reshape(-1)]
+              return record
+
+          result = {
+              'phase': 'REDUCED TECHNICAL PROBE AFTER PRE-METRIC SCHEMA FAILURE',
+              'outcome_values_read_or_printed': False,
+              'spectra_read_or_printed': False,
+              'subject_ids_read_or_printed': False,
+              'axes_length': int(axes.size),
+              'labels_length': int(labels.size),
+              'unused_axes_1': describe(axes[1]),
+              'unused_axes_3': describe(axes[3]),
+          }
+          with open('esp-unused-schema.json', 'w', encoding='utf-8') as handle:
+              json.dump(result, handle, sort_keys=True, indent=2)
+              handle.write('\n')
+          print(json.dumps(result, sort_keys=True, indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: esp-unused-schema-probe
+          path: esp-unused-schema.json
+          if-no-files-found: warn
+          retention-days: 1
