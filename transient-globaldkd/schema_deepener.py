@@ -39,10 +39,12 @@ def _redact_probe_numeric_text(text: str) -> str:
 
 
 def extract_mlx_code(payload: bytes, include_probe: bool = False) -> tuple[str, str]:
-    """Extract code-tag text from every MLX XML member and optionally diagnose tags."""
+    """Extract WordprocessingML paragraphs styled as code, with a safe fallback."""
     with zipfile.ZipFile(io.BytesIO(payload)) as live:
-        blocks: list[str] = []
-        seen: set[str] = set()
+        word_blocks: list[str] = []
+        fallback_blocks: list[str] = []
+        seen_word: set[str] = set()
+        seen_fallback: set[str] = set()
         histograms: dict[str, dict[str, int]] = {}
         probes: list[str] = []
 
@@ -55,40 +57,71 @@ def extract_mlx_code(payload: bytes, include_probe: bool = False) -> tuple[str, 
             except ElementTree.ParseError:
                 continue
 
-            tags = Counter(
-                node.tag.rsplit("}", 1)[-1].lower()
-                for node in root.iter()
-            )
+            def local_name(tag: str) -> str:
+                return tag.rsplit("}", 1)[-1].lower()
+
+            tags = Counter(local_name(node.tag) for node in root.iter())
             histograms[member] = dict(sorted(tags.items()))
 
-            if include_probe and member.lower().endswith("document.xml"):
-                raw = xml_bytes.decode("utf-8", errors="replace")
-                itertext = "\\n".join(
-                    text.strip() for text in root.itertext() if text.strip()
-                )
-                probes.extend(
-                    [
-                        f"===== XML PROBE: {member} TAG HISTOGRAM =====",
-                        json.dumps(histograms[member], indent=2, sort_keys=True),
-                        f"===== XML PROBE: {member} RAW FIRST 20000 CHARS; NUMBERS REDACTED =====",
-                        _redact_probe_numeric_text(raw[:20000]),
-                        f"===== XML PROBE: {member} ITERTEXT FIRST 20000 CHARS; NUMBERS REDACTED =====",
-                        _redact_probe_numeric_text(itertext[:20000]),
-                    ]
-                )
+            if member.lower().endswith("document.xml"):
+                for paragraph in (
+                    node for node in root.iter() if local_name(node.tag) == "p"
+                ):
+                    styles = []
+                    for node in paragraph.iter():
+                        if local_name(node.tag) != "pstyle":
+                            continue
+                        styles.extend(
+                            str(value).lower()
+                            for key, value in node.attrib.items()
+                            if local_name(key) == "val"
+                        )
+                    if "code" not in styles:
+                        continue
+                    source = "".join(
+                        "".join(node.itertext())
+                        for node in paragraph.iter()
+                        if local_name(node.tag) == "t"
+                    ).strip()
+                    if source and source not in seen_word:
+                        seen_word.add(source)
+                        word_blocks.append(
+                            f"% ---- MLX source: {member}; pStyle=code ----\\n{source}"
+                        )
+
+                if include_probe:
+                    raw = xml_bytes.decode("utf-8", errors="replace")
+                    itertext = "\\n".join(
+                        text.strip() for text in root.itertext() if text.strip()
+                    )
+                    probes.extend(
+                        [
+                            f"===== XML PROBE: {member} TAG HISTOGRAM =====",
+                            json.dumps(histograms[member], indent=2, sort_keys=True),
+                            f"===== XML PROBE: {member} RAW FIRST 20000 CHARS; NUMBERS REDACTED =====",
+                            _redact_probe_numeric_text(raw[:20000]),
+                            f"===== XML PROBE: {member} ITERTEXT FIRST 20000 CHARS; NUMBERS REDACTED =====",
+                            _redact_probe_numeric_text(itertext[:20000]),
+                        ]
+                    )
 
             for node in root.iter():
-                tag = node.tag.rsplit("}", 1)[-1].lower()
+                tag = local_name(node.tag)
                 if tag not in {"mcode", "code", "input"}:
                     continue
                 source = "".join(node.itertext()).strip()
-                if not source or source in seen:
+                if not source or source in seen_fallback:
                     continue
-                seen.add(source)
-                blocks.append(
-                    f"% ---- MLX source: {member}; tag={tag} ----\\n{source}"
+                seen_fallback.add(source)
+                fallback_blocks.append(
+                    f"% ---- MLX fallback: {member}; tag={tag} ----\\n{source}"
                 )
 
+        blocks = word_blocks or fallback_blocks
+        source_mode = (
+            "WordprocessingML pStyle=code" if word_blocks
+            else "mcode/code/input fallback"
+        )
         if include_probe:
             probes.extend(
                 [
@@ -97,8 +130,10 @@ def extract_mlx_code(payload: bytes, include_probe: bool = False) -> tuple[str, 
                     "===== EXTRACTED SOURCE INVENTORY =====",
                     json.dumps(
                         {
+                            "source_mode": source_mode,
                             "block_count": len(blocks),
                             "character_count": sum(len(item) for item in blocks),
+                            "fallback_block_count": len(fallback_blocks),
                         },
                         indent=2,
                         sort_keys=True,
