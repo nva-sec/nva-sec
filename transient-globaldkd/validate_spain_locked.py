@@ -132,12 +132,27 @@ def load_spain_after_unlock(archive: Path) -> dict:
     if not isinstance(esp, dict):
         raise RuntimeError(f"ESP did not simplify to dict: {type(esp).__name__}")
     spectra = np.asarray(esp["data"], dtype=np.float64)
-    axes = np.asarray(esp["axisscale"], dtype=object).reshape(-1)
-    labels = np.asarray(esp["label"], dtype=object).reshape(-1)
+    axes_container = np.asarray(esp["axisscale"], dtype=object)
+    labels_container = np.asarray(esp["label"], dtype=object)
+    if axes_container.shape != (2, 2):
+        raise RuntimeError(
+            f"unexpected ESP.axisscale container shape: {axes_container.shape}"
+        )
+    if labels_container.shape != (2, 2):
+        raise RuntimeError(
+            f"unexpected ESP.label container shape: {labels_container.shape}"
+        )
+    axes = axes_container.reshape(-1)
+    labels = labels_container.reshape(-1)
     albumin = np.asarray(axes[0], dtype=np.float64).reshape(-1)
     wavenumbers = np.asarray(axes[2], dtype=np.float64).reshape(-1)
+    label_id_cell = np.asarray(labels[0])
+    if label_id_cell.shape != (61,) or label_id_cell.dtype.kind != "U":
+        raise RuntimeError(
+            "Spanish ID label cell is not the audited Unicode vector shape (61,)"
+        )
     subject_ids = np.char.strip(
-        np.asarray(labels[0], dtype=str).reshape(-1)
+        np.asarray(label_id_cell, dtype=str).reshape(-1)
     ).astype(str)
 
     if spectra.shape != (61, 1598):
@@ -161,9 +176,24 @@ def load_spain_after_unlock(archive: Path) -> dict:
     expected_grid = np.arange(3994.0, 798.0, -2.0, dtype=np.float64)
     if not np.array_equal(wavenumbers, expected_grid):
         raise RuntimeError("Spanish axis is not the audited 3994..800 step -2 grid")
-    if str(axes[1]) != "" or str(axes[3]) != "":
+    def is_audited_empty_unicode_cell(value: object) -> bool:
+        cell = np.asarray(value)
+        return bool(
+            cell.shape == (0,)
+            and cell.size == 0
+            and cell.dtype == np.dtype("<U1")
+        )
+
+    if not all(is_audited_empty_unicode_cell(axes[index]) for index in (1, 3)):
         raise RuntimeError(
-            "Spanish PLS axis-label slots differ from audited empty-string schema"
+            "Spanish empty axis-label cells differ from audited <U1 shape-(0,) schema"
+        )
+    if not all(
+        is_audited_empty_unicode_cell(labels[index])
+        for index in (1, 2, 3)
+    ):
+        raise RuntimeError(
+            "Spanish empty label cells differ from audited <U1 shape-(0,) schema"
         )
 
     outcome = (albumin >= CUTOFF_MG_L).astype(np.uint8)
@@ -702,7 +732,11 @@ def main() -> None:
             "ESP_only": True,
             "shape_61_by_1598": True,
             "axis_grid_3994_to_800_step_minus_2": True,
-            "axis_label_slots_match_audited_schema": True,
+            "ESP_axisscale_object_container_shape_2_by_2": True,
+            "ESP_label_object_container_shape_2_by_2": True,
+            "empty_axis_label_cells_U1_shape_0": True,
+            "label_ID_cell_Unicode_shape_61": True,
+            "empty_label_cells_U1_shape_0": True,
             "unique_spanish_ids": True,
             "sites_derived_from_audited_ID_prefixes": True,
             "audited_Valencia_then_Madrid_block_order": True,
